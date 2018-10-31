@@ -1,4 +1,4 @@
-all: game.d64 gameef.crt gamegmod2.crt
+all: example.d64 exampleef.crt examplegmod2.crt
 
 clean:
 	del *.prg
@@ -9,25 +9,24 @@ clean:
 	del *.d81
 	del pagecross.txt
 
-game.d64: game.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak
-	maked64 game.d64 game.seq EXAMPLE_GAME______EG_2A 10
+example.d64: example.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak
+	maked64 example.d64 example.seq EXAMPLE_GAME______EG_2A 10
 
-gameef.crt: game.d64 game.seq main.pak loadsym.s mainsymcart.s efboot.s
+exampleef.crt: example.d64 example.seq main.pak loadsym.s mainsymcart.s efboot.s
 	dasm efboot.s -oefboot.bin -f3
-	makeef efboot.bin game.seq gameef.bin
-	cartconv -p -i gameef.bin -o gameef.crt -t easy
+	makeef efboot.bin example.seq exampleef.bin
+	cartconv -p -i exampleef.bin -o exampleef.crt -t easy
 
-gamegmod2.crt: game.d64 game.seq main.pak loadsym.s mainsymcart.s gmod2boot.s
+examplegmod2.crt: example.d64 example.seq main.pak loadsym.s mainsymcart.s gmod2boot.s
 	dasm gmod2boot.s -ogmod2boot.bin -f3
-	makegmod2 gmod2boot.bin game.seq gamegmod2.bin
-	cartconv -p -i gamegmod2.bin -o gamegmod2.crt -t gmod2
+	makegmod2 gmod2boot.bin example.seq examplegmod2.bin
+	cartconv -p -i examplegmod2.bin -o examplegmod2.crt -t gmod2
 
-loader.prg: kernal.s loader.s loadsym.txt ldepacksym.txt ldepack.s exomizer.s loaderstack.s macros.s memory.s
+loader.prg: kernal.s loader.s ldepack.s exomizer.s macros.s memory.s loadsym.txt ldepacksym.txt
 	dasm ldepack.s -oldepack.prg -sldepack.tbl -f3
 	symbols ldepack.tbl ldepacksym.s ldepacksym.txt
 	dasm loader.s -oloader.bin -sloader.tbl -f3
 	symbols loader.tbl loadsym.s loadsym.txt
-	dasm loaderstack.s -oloaderstack.bin -f3
 	pack2 loader.bin loader.pak
 	dasm ldepack.s -oloader.prg -sldepack.tbl -f3
 	symbols ldepack.tbl ldepacksym.s ldepacksym.txt

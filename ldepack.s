@@ -1,4 +1,4 @@
-        ; Loader depacker
+        ; Exomizer + loader stored as packed data
 
 EXOMIZER_ERRORHANDLING = 1                      ;Error handling needed when loading from disk
 
@@ -9,8 +9,8 @@ EXOMIZER_ERRORHANDLING = 1                      ;Error handling needed when load
 
                 include exomizer.s
 
-OpenFile:       rts
-SaveFile        = OpenFile+3
+OpenFile:       rts                             ;Initial OpenFile routine: do nothing
+SaveFile        = OpenFile+3                    ;Initial SaveFile routine doesn't exist / isn't used
 GetByte         = OpenFile+6
 
                 jsr ChrIn
@@ -18,9 +18,8 @@ GetByte         = OpenFile+6
                 rts
 
                 org GetByte
-                jmp OpenFile+1
-
-                incbin loaderstack.bin
+                jmp OpenFile+1                  ;Initial GetByte routine: jump to implementation above
 
 packedLoaderStart:
-                incbin loader.pak
+                incbin loader.pak               ;Packed loader data
+                

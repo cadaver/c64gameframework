@@ -2,6 +2,7 @@
 
                 include memory.s
                 include kernal.s
+                include loadsym.s
                 include ldepacksym.s
 
                 org $032a
@@ -55,18 +56,18 @@ ShowMessage:    lda #$0f
                 sta $2000+12*40+1,y
                 dey
                 bne ShowMessage
-LoadExomizer:   jsr ChrIn                       ;Load Exomizer as unpacked data
-                sta exomizerCodeStart,y         ;and push the next routines to call to stack
+LoadExomizer:   jsr ChrIn                       ;Load the unpacked Exomizer
+                sta exomizerCodeStart,y
                 iny
-                cpy #packedLoaderStart-exomizerCodeStart-6
-                bcc LoadExomizer
-                pha
                 cpy #packedLoaderStart-exomizerCodeStart
                 bcc LoadExomizer
-                tax
-                pla
-                pla
-                rts
+                lda #>(InitLoader-1)            ;Push loader entrypoint to stack
+                pha
+                lda #<(InitLoader-1)
+                pha
+                lda #<loaderCodeStart
+                ldx #>loaderCodeStart
+                jmp LoadFile                    ;Use Exomizer to load the packed loader
 
 message:        dc.b "HOLD SPACE/FIRE FOR SAFE MODE "
 loaderFileName: dc.b "LOADER"
