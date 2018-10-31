@@ -385,7 +385,7 @@ PPDS_SkipLoadTop:
                 loadrow PDSRow9,PDSRight9,PDSLeft9,9
                 lda blockY
                 beq PPDS_SkipLoadTop
-                loadrow PDSTopRow,PDSTopRight,PDSTopLeft,-1
+                loadrow DSTopRow,DSTopRight,DSTopLeft,-1
                 loadrow PDSBottomRow,PDSBottomRight,PDSBottomLeft,10
                 rts
 PPDS_SkipLoadTop:
@@ -429,7 +429,7 @@ PDSLowerHalfEndCmp:
                 inx
                 inx
 PDSLowerHalfJump:jmp PDSRow10
-PDSLowerHalfDone:if RIGHTCLIPPING = 1
+PDSLowerHalfDone:if RIGHTCLIPPING > 0
                 clc
                 lda dsBlockX
                 beq PDSLowerHalfRight

@@ -15,4 +15,4 @@ MAX_ACTY        = 19
 
 SCROLLROWS      = 23
 USETURBOMODE    = 1                             ;Use C128 & SuperCPU turbo mode
-RIGHTCLIPPING   = 0                             ;Dedicated routines for drawing to screen right edge for less rastertime
+RIGHTCLIPPING   = 0                             ;If 1, use dedicated routines for drawing to screen right edge for less rastertime

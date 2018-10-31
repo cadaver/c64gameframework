@@ -654,7 +654,7 @@ DSUpperHalfEndCmp:
                 inx
 DSUpperHalfJump:jmp DSRow0
 DSUpperHalfDone:clc
-                if RIGHTCLIPPING = 1
+                if RIGHTCLIPPING > 0
                 lda dsBlockX
                 beq DSUpperHalfRight
                 jmp DSUpperHalfNoRight
@@ -702,7 +702,7 @@ DSLowerHalfEndCmp:
                 inx
                 inx
 DSLowerHalfJump:jmp DSRow6
-DSLowerHalfDone:if RIGHTCLIPPING = 1
+DSLowerHalfDone:if RIGHTCLIPPING > 0
                 clc
                 lda dsBlockX
                 beq DSLowerHalfRight
@@ -722,8 +722,10 @@ DSLowerHalfNoRight:
                 endif
                 rts
 
-                lda upperHalfJumpTblLo,y        ;Padding; the patched NTSC drawscreen is longer
-                sta DSUpperHalfJump+1           ;Use actual code instead of zeroes, as the code is used as the random generator
-                rts
+                if RIGHTCLIPPING > 0
+                ds.b 9,$55          ;Padding; the patched NTSC drawscreen is longer
+                else
+                ds.b 7,$55
+                endif
 
 DrawScreenEnd:
