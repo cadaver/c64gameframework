@@ -146,13 +146,13 @@ IsPal:          lda #<NMI                       ;Set NMI vector
                 sta firstSaveBank
                 lda #$35                        ;ROMs off
                 sta $01
-                lda #>(loaderCodeEnd-1)         ;Store intro picture entrypoint to stack
+                lda #>(loaderCodeEnd-1)         ;Store mainpart entrypoint to stack
                 pha
                 tax
                 lda #<(loaderCodeEnd-1)
                 pha
                 lda #<loaderCodeEnd
-                jmp LoadFile                    ;Load intro picture part (overwrites loader init)
+                jmp LoadFile                    ;Load mainpart (overwrites loader init)
 
 initCodeEnd:    ds.b $300-initCodeEnd,$ff
 
@@ -517,7 +517,7 @@ saveCodeEnd:    ds.b $f800-saveCodeEnd,$ff
 
                 dc.b $65,$66,$2d,$6e,$41,$4d,$45,$3a
                 dc.b "examplegame",0,0,0,0,0
-                
+
 cartNameEnd:    ds.b $fffa-cartNameEnd,$ff
 
                 org $fffa

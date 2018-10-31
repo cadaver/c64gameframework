@@ -150,13 +150,13 @@ IL_CopyLoaderCode:
                 bne IL_CopyLoaderCode
                 lda #$35                        ;ROMs off
                 sta $01
-                lda #>(loaderCodeEnd-1)         ;Store intro picture entrypoint to stack
+                lda #>(loaderCodeEnd-1)         ;Store mainpart entrypoint to stack
                 pha
                 tax
                 lda #<(loaderCodeEnd-1)
                 pha
                 lda #<loaderCodeEnd
-                jmp LoadFile                    ;Load intro picture part (overwrites loader init)
+                jmp LoadFile                    ;Load mainpart (overwrites loader init)
 
         ; Slow fileopen / getbyte / save routines
 
