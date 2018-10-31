@@ -1,0 +1,7 @@
+; File directory order
+boot.prg EXAMPLEGAME
+loader.prg LO
+main.pak 00
+music00.pak 01
+charset00.pak 02
+level00.pak 03
