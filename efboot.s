@@ -516,8 +516,8 @@ saveCodeEnd:    ds.b $f800-saveCodeEnd,$ff
                 org $fb00
 
                 dc.b $65,$66,$2d,$6e,$41,$4d,$45,$3a
-                dc.b "mw ultra",0,0,0,0,0,0,0,0
-
+                dc.b "examplegame",0,0,0,0,0
+                
 cartNameEnd:    ds.b $fffa-cartNameEnd,$ff
 
                 org $fffa

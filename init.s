@@ -101,6 +101,9 @@ InitVideo:      sta $d01b                       ;Sprites on top of BG
                 sta $d020
                 sta $d026                       ;Set sprite multicolor 2
                 sta $d415                       ;Filter lowbyte for all subsequent music
+                lda $dd00                       ;Only videobank 0 supported due to the disk fastloader
+                and #$fc
+                sta $dd00
                 lda #$ff-$40                    ;Init reading joystick + select reading port 2 paddles for 2nd firebutton
                 sta $dc00
                 lda #$0a

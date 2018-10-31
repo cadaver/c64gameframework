@@ -79,9 +79,6 @@ IL_IsPal:       lda #<NMI                       ;Set NMI vector
                 stx $dd05
                 lda #%00011001                  ;Run Timer A in one-shot mode
                 sta $dd0e
-                lda $dd00                       ;Loader supports only videobank 0
-                and #$fc
-                sta $dd00
                 lda $dc00                       ;Check for safe mode loader
                 and $dc01
                 and #$10
