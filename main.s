@@ -11,9 +11,9 @@ SHOW_DEBUG_VARS         = 0
 
                 org loaderCodeEnd
 
-EntryPoint:     ldx #$ff
+EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 txs
-                jsr InitAll                     ;Entrypoint, call to disposable init
+                jsr InitAll                     ;Call to disposable init code
                 lda #1
                 jsr PlaySong
                 lda #0
