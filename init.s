@@ -83,13 +83,14 @@ ISpr_Loop:      txa
                 dex
                 bpl ISpr_Loop
 
-        ; Initialize sprite cache variables
+        ; Initialize sprite cache variables + the empty sprite
 
                 ldx #$3f
 ISprC_Loop:     lda #$ff
                 sta cacheSprFile,x
                 lda #$00
                 sta cacheSprAge,x
+                sta emptySprite,x
                 dex
                 bpl ISprC_Loop
 
