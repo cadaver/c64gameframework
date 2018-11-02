@@ -12,6 +12,7 @@ Technical details:
 - Graphical editing of sprite collision bounds
 - Dynamic memory allocation for sprites & level data & loadable code
 - [Miniplayer](https://github.com/cadaver/miniplayer) music & sound playback
+- Filter cutoff compensation on 8580 SID to make it sound more like 6581
 - Accelerated CPU mode on C128 & SuperCPU, activated in the vertical border
 - Loader based on the CovertBitops Loader V2.24 (1541/1581/FD/HD/IDE64)
 - EasyFlash & GMOD2 mastering and save support

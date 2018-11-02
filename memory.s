@@ -195,7 +195,6 @@ spriteCache     = $d000
 colors          = $d800
 panelScreen     = $e000
 panelChars      = $e000
-emptySprite     = $e300
 blkTL           = $e400
 blkTR           = $e500
 blkBL           = $e600
@@ -207,7 +206,8 @@ charAnimCode    = $f180
 lvlObjAnimFrames = $f200
 miscVarArea1    = $f240
 screen          = $f800
-miscVarArea2    = $fc00
+emptySprite     = $fc00
+miscVarArea2    = $fc40
 
                 varbase panelScreen+24*40
                 varrange boundsAct,MAX_BOUNDS

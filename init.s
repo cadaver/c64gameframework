@@ -153,6 +153,9 @@ IPC_Sta:        sta panelChars,x
                 ldx #79
 IPC_PanelScreenLoop:
                 lda #$20
+                if NTSCSIZEREDUCE > 0
+                sta panelScreen+21*40,x         ;Clear also the one row above if scrolling area may be reduced
+                endif
                 sta panelScreen+22*40,x
                 lda #$00
                 sta colors+22*40,x
@@ -198,9 +201,11 @@ IA_UseTurbo:    lda #$a6
                 sta Irq5_TurboCheck+1
                 bne IA_NoNtscPatch              ;If can use turbo mode, do not reduce scrolling area
                 endif
-IA_NoTurbo:     lda ntscFlag
+IA_NoTurbo:     if NTSCSIZEREDUCE > 0
+                lda ntscFlag
                 beq IA_NoNtscPatch
                 jsr ApplyNtscPatch
+                endif
 IA_NoNtscPatch:
 
         ; Initialize IRQs
@@ -238,8 +243,10 @@ StopIrq:        jsr WaitBottom
                 rts
 StopIrqEnd:
 
+                if NTSCSIZEREDUCE > 0
+
         ; NTSC patch for one less scrolling row
-        
+
 ApplyNtscPatch: lda #IRQ4_LINE-8
                 sta Irq2_Irq4Line+1
                 sta Irq4_Irq4Line+1
@@ -459,14 +466,17 @@ PatchedDrawScreenEnd:
                     err
                 endif
 
+panelRowTblLo:  dc.b <PanelRowAccess1
+                dc.b <PanelRowAccess2
+
+panelRowTblHi:  dc.b >PanelRowAccess1
+                dc.b >PanelRowAccess2
+                
+                endif
+
         ; Data
 
 defaultConfig:  incbin config.bin
 
 panelCharData:  incbin bg\scorescr.chr
 
-panelRowTblLo:  dc.b <PanelRowAccess1
-                dc.b <PanelRowAccess2
-
-panelRowTblHi:  dc.b >PanelRowAccess1
-                dc.b >PanelRowAccess2

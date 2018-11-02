@@ -722,10 +722,13 @@ DSLowerHalfNoRight:
                 endif
                 rts
 
+                if NTSCSIZEREDUCE > 0
+
                 if RIGHTCLIPPING > 0
                 ds.b 9,$55          ;Padding; the patched NTSC drawscreen is longer
                 else
                 ds.b 7,$55
                 endif
 
+                endif
 DrawScreenEnd:
