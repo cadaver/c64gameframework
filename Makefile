@@ -9,7 +9,7 @@ clean:
 	del *.d81
 	del pagecross.txt
 
-example.d64: example.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak
+example.d64: example.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak sprplayer.pak sprcommon.pak
 	maked64 example.d64 example.seq EXAMPLE_GAME______EG_2A 10
 
 exampleef.crt: example.d64 example.seq main.pak loadsym.s mainsymcart.s efboot.s
@@ -57,3 +57,8 @@ charset00.pak: charset00.s mainsym.s memory.s bg/world00.blk bg/world00.bli bg/w
 	dasm charset00.s -ocharset00.bin -f3
 	pack2 charset00.bin charset00.pak
 
+sprcommon.pak: spr/common.spr.res
+	pchunk2 spr/common.spr.res sprcommon.pak
+
+sprplayer.pak: spr/player.spr.res
+	pchunk2 spr/player.spr.res sprplayer.pak

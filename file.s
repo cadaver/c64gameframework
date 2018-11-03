@@ -1,12 +1,4 @@
-F_MUSIC         = $01
-F_CHARSET       = $02
-F_LEVEL         = $03
-F_CHUNK         = $04-1
-
-C_LEVEL         = 0                             ;Level chunk will be loaded from different filenames
-
-C_FIRSTPURGEABLE = 4                            ;First chunk that can be removed from memory. Put e.g. always resident spritefiles to lower indices
-C_FIRSTSCRIPT   = 7                             ;Remember to update this, otherwise sprite etc. resources will be relocated as code!
+C_LEVEL         = 0                             ;Level chunk is fixed, and will be loaded from different filenames
 
         ; Create a number-based file name
         ;

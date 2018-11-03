@@ -5,3 +5,5 @@ main.pak 00
 music00.pak 01
 charset00.pak 02
 level00.pak 03
+sprcommon.pak 04
+sprplayer.pak 05

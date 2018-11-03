@@ -1,3 +1,5 @@
+        ; Defines that affect the memory map
+
 MAX_SPR         = 24
 MAX_CACHESPRITES = 64
 MAX_CHUNKFILES  = 64
