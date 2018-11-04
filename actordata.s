@@ -1,22 +1,18 @@
 ACT_NONE        = 0
-ACT_ITEM        = 1
+ACT_PLAYER      = 1
+ACT_ITEM        = 2
 
-xCoordTbl:
-N               set -8
-                repeat MAX_ACTX
-                dc.b <N
-N               set N+8
-                repend
+actDataTblLo:   dc.b <actPlayer
 
-yCoordTbl:
-N               set 0
-                repeat MAX_ACTY
-                dc.b <N
-N               set N+16
-                repend
-
-actDataTblLo:
-
-actDataTblHi:
+actDataTblHi:   dc.b >actPlayer
 
 actBottomAdjustTbl:
+                dc.b -2
+
+actPlayer:      dc.b GRP_HEROES|AF_NOREMOVECHECK   ;Flags
+                dc.b 64                             ;Initial health
+                dc.w $0000+USESCRIPT                ;Update routine, script entrypoint or address of inbuilt engine code (< $8000)
+                dc.w $0001+USESCRIPT                ;Draw routine, script entrypoint or address of inbuilt engine code (< $8000)
+                dc.b 8                              ;Gravity acceleration
+                dc.b $40                            ;Side collision offset
+                dc.b -2                             ;Top collision offset

@@ -179,6 +179,20 @@ sortSprXMSB:    ds.b MAX_SPR*2,0
 sortSprXExpand: ds.b MAX_SPR*2,0
 sprIrqLine:     ds.b MAX_SPR*2,0
 
+xCoordTbl:
+N               set -8
+                repeat MAX_ACTX
+                dc.b <N
+N               set N+8
+                repend
+
+yCoordTbl:
+N               set 0
+                repeat MAX_ACTY
+                dc.b <N
+N               set N+16
+                repend
+
         ; Must be before save to know save size
 
                 include bg/worldinfo.s

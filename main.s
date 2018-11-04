@@ -17,9 +17,10 @@ F_CHUNK         = $04-1
 
 C_COMMON        = 1                             ;Common sprites
 C_PLAYER        = 2                             ;Player sprites
+C_SCRIPT0       = 3                             ;First script (loadable code) file, with player movement / render code
 
 C_FIRSTPURGEABLE = C_PLAYER                     ;First chunk that can be removed from memory. Put e.g. always resident spritefiles to lower indices
-C_FIRSTSCRIPT   = 3                             ;Remember to update this, otherwise sprite etc. resources will be relocated as code!
+C_FIRSTSCRIPT   = C_SCRIPT0                     ;Remember to update this, otherwise sprite etc. resources will be relocated as code!
 
                 include memory.s
                 include loadsym.s
@@ -37,9 +38,17 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 jsr ChangeLevel
                 lda #0
                 jsr ChangeZone
-                jsr RedrawScreen
-                lda #4
-                sta scrollSX
+
+                lda #ACT_PLAYER                 ;Create player actor & redraw screen
+                sta actT+ACTI_PLAYER
+                lda #9
+                sta actXH+ACTI_PLAYER
+                lda #$40
+                sta actXL+ACTI_PLAYER
+                lda #9
+                sta actYH+ACTI_PLAYER
+                jsr CenterPlayer
+
                 lda #<txtWelcome
                 ldx #>txtWelcome
                 jsr PrintPanelTextIndefinite

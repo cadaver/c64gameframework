@@ -6,10 +6,8 @@ clean:
 	del *.tbl
 	del *sym.s
 	del *.d64
-	del *.d81
-	del pagecross.txt
 
-example.d64: example.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak sprplayer.pak sprcommon.pak
+example.d64: example.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak sprplayer.pak sprcommon.pak script00.pak
 	maked64 example.d64 example.seq EXAMPLE_GAME______EG_2A 10
 
 exampleef.crt: example.d64 example.seq main.pak loadsym.s mainsymcart.s efboot.s
@@ -62,3 +60,7 @@ sprcommon.pak: spr/common.spr.res
 
 sprplayer.pak: spr/player.spr.res
 	pchunk2 spr/player.spr.res sprplayer.pak
+
+script00.pak: script00.s mainsym.s macros.s memory.s
+	dasm script00.s -oscript00.bin -f3
+	pchunk2 script00.bin script00.pak

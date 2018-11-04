@@ -107,7 +107,7 @@ InitVideo:      sta $d01b                       ;Sprites on top of BG
                 sta $dd00
                 lda #$ff-$40                    ;Init reading joystick + select reading port 2 paddles for 2nd firebutton
                 sta $dc00
-                lda #$0a
+                lda #$01
                 sta $d025                       ;Set sprite multicolor 1
                 lda #$ff                        ;Set all sprites multicolor
                 sta $d01c

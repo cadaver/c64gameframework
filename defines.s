@@ -15,6 +15,12 @@ MAX_NAVAREAS    = 48
 MAX_ACTX        = 26
 MAX_ACTY        = 19
 
+ACTI_PLAYER     = 0
+ACTI_FIRSTNPC   = 1
+ACTI_LASTNPC    = MAX_COMPLEXACT-1
+ACTI_FIRSTNONNPC = MAX_COMPLEXACT
+ACTI_LAST       = MAX_ACT-1
+
 SCROLLROWS      = 23
 USETURBOMODE    = 1                             ;Use C128 & SuperCPU turbo mode
 NTSCSIZEREDUCE  = 1                             ;Reduce scrolling area by 1 row on unaccelerated NTSC machines
