@@ -782,9 +782,7 @@ RCP_Loop:       jsr GetSaveMiscVar
         ; Returns: -
         ; Modifies: A,X,Y,various
 
-CenterPlayer:   ;lda #-SCROLLCENTER_X
-                ;sta DP_ScrollCenterX+1
-                lda actXH+ACTI_PLAYER
+CenterPlayer:   lda actXH+ACTI_PLAYER
                 sec
                 sbc #9
                 bpl CP_NotOverLeft
