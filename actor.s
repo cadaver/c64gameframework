@@ -731,6 +731,17 @@ ResetSpeed:     lda #MB_GROUNDED
                 sta actSY,x
                 rts
 
+        ; Disable movement interpolation for the current frame. To be called during actor's own update.
+        ;
+        ; Parameters: X actor index
+        ; Returns: Z=0
+        ; Modifies: A
+
+NoInterpolation:lda currFlags
+                ora #AF_NOINTERPOLATION
+                sta currFlags
+                rts
+
         ; Add actor from leveldata
         ;
         ; Parameters: X leveldata index, must also be in zpDestLo

@@ -126,7 +126,7 @@ Print3BCDDigitsLeftAlign:
                 lda zpDestHi
                 beq P3BDLA_SkipFirst
                 jsr PrintBCDDigit
-                lda zpDestLo
+PrintBCDDigits: lda zpDestLo
                 pha
                 lsr
                 lsr

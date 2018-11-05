@@ -5386,7 +5386,7 @@ void updatenavareas(Zone& zone)
                 if (area.r - area.l > 1)
                     ++idx;
             }
-            else if ((bi & 0x81) == 1 && (bi & 0x60) != 0) // Up-right slope
+            else if ((bi & 0x81) == 1 && (bi & 0x60) != 0 && (bi & 0x60) != 0x40) // Up-right slope
             {
                 NavArea& area = zone.navareas[idx];
                 area.type = NAVAREA_SLOPEUPRIGHT;

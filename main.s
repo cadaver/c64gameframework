@@ -39,19 +39,20 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 lda #0
                 jsr ChangeZone
 
+                ldx #ACTI_PLAYER
                 lda #ACT_PLAYER                 ;Create player actor & redraw screen
-                sta actT+ACTI_PLAYER
-                lda #9
-                sta actXH+ACTI_PLAYER
+                sta actT,x
+                lda #28
+                sta actXH,x
                 lda #$40
-                sta actXL+ACTI_PLAYER
-                lda #9
-                sta actYH+ACTI_PLAYER
-                jsr CenterPlayer
+                sta actXL,x
+                lda #15
+                sta actYH,x
+                jsr InitActor                   ;Init health & actor flags
+                jsr CenterPlayer                ;Center scrolling on player & redraw
 
-                lda #<txtWelcome
-                ldx #>txtWelcome
-                jsr PrintPanelTextIndefinite
+                lda #4                          ;Adjust text margin for the health display
+                sta textLeftMargin
 
 MainLoop:       jsr ScrollLogic
                 jsr DrawActors
@@ -61,7 +62,22 @@ MainLoop:       jsr ScrollLogic
                 jsr UpdateActors
                 jsr UpdateFrame
                 jsr UpdateLevelObjects
+                jsr RedrawHealth
                 jmp MainLoop
+
+RedrawHealth:   lda actHp+ACTI_PLAYER           ;Redraw health to left side of scorepanel if changed
+                cmp displayedHealth
+                beq RH_SameValue
+                sta displayedHealth
+                jsr ConvertToBCD8
+                ldx #0
+                lda zpDestHi
+                jsr PrintBCDDigit
+                lda zpDestLo
+                jmp PrintBCDDigits
+RH_SameValue:   rts
+
+displayedHealth:dc.b $ff
 
 randomAreaStart:
                 include raster.s
@@ -77,8 +93,6 @@ randomAreaStart:
                 include ai.s
                 include level.s
 randomAreaEnd:
-
-txtWelcome:     dc.b "C64GAMEFRAMEWORK EXAMPLE",0
 
                 include playroutinedata.s
                 include sounddata.s

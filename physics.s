@@ -241,8 +241,8 @@ MWG_InAirUpNoLanding:
                 jsr MoveActorY
                 lda topOffset
                 jsr GetBlockInfoY
-                cmp #BI_WALL
-                beq MWG_HitCeiling
+                and #BI_WALL
+                bne MWG_HitCeiling
                 lda actMB,x
                 rts
 MWG_HitCeiling: lda #$00
