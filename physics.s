@@ -242,13 +242,13 @@ MWG_InAirUpNoLanding:
                 lda topOffset
                 jsr GetBlockInfoY
                 and #BI_WALL
-                bne MWG_HitCeiling
-                lda actMB,x
-                rts
+                beq MWG_NoHitCeiling
 MWG_HitCeiling: lda #$00
                 sta actSY,x
                 sta actYL,x
                 inc actYH,x
+MWG_NoHitCeiling:
+                lda actMB,x
                 rts
 
         ; Move projectile actor in a straight line, remove if goes outside
