@@ -39,8 +39,8 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 lda #0
                 jsr ChangeZone
 
-                ldx #ACTI_PLAYER
-                lda #ACT_PLAYER                 ;Create player actor & redraw screen
+                ldx #ACTI_PLAYER                ;Create player actor. Player movement code is in script00.s
+                lda #ACT_PLAYER                 ;to demonstrate runtime code loading / relocation
                 sta actT,x
                 lda #28
                 sta actXH,x

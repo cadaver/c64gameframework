@@ -125,9 +125,10 @@ DA_FillSprites: ldx numSpr                      ;If less sprites used than last 
 DA_FillSpritesLoop:
                 sta sprY,x
                 inx
-DA_LastSprIndex:cpx #$00
+DA_LastSprIndex:cpx #MAX_SPR
                 bcc DA_FillSpritesLoop
-DA_FillSpritesDone:
+                lda numSpr
+                sta DA_LastSprIndex+1           ;Store used sprite count for next frame's cleanup
 
         ; Add actors to screen. Also perform line-of-sight check for one actor at a time if requested
         ;
@@ -347,7 +348,6 @@ UA_ActorsDone:  lda #$4c                        ;Restore sprite draw operation
 
 InterpolateActors:
                 ldx numSpr
-                stx DA_LastSprIndex+1           ;Store used sprite count for next frame's cleanup
                 dex
                 bmi IA_Done
 IA_SprLoop:     lda sprC,x                      ;Process flickering
