@@ -1146,7 +1146,6 @@ InitActor:      jsr GetActorData
                 bcs IA_NotComplex
                 sta actAttackD,x
                 sta actCtrl,x
-                sta actMoveCtrl,x
                 sta actPrevCtrl,x
                 sta actTarget,x
                 sta actNavArea,x
@@ -1323,7 +1322,7 @@ SetFlickerColor:txa
         ; Get connect point for bullet spawn. Should only be called during actor update,
         ; as it does a fake actor render, and during the update producing actual sprites is patched out
         ;
-        ; Parameters: X attacking actor,
+        ; Parameters: X attacking actor
         ; Returns: xLo-yHi connect offset
         ; Modifies: A,Y,loader temp vars
 
@@ -1333,7 +1332,7 @@ GetConnectPoint:
                 sta yLo
                 ldy #AD_DRAW+1
                 jsr ActorCall                   ;Perform a fake draw call without producing sprites
-                ldx actIndex
+                ldx actIndex                    ;Restore actor index after draw
                 lda yLo
                 lsr
                 lsr

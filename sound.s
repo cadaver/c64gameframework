@@ -30,12 +30,11 @@ KEYOFF          = $7e
 REST            = $7f
 
 SFXEND          = $00
-SFXFREQ         = $02
-SFXFREQMOD      = $04
-SFXNOWAVE       = $90
-SFXINIT         = $91
-SFXFREQONLY     = $a0
-SFXFIRSTDELAY   = $e0
+SFXINIT         = $01
+SFXPULSE        = $02
+SFXWAVE         = $04
+SFXFREQ         = $08
+SFXFREQMOD      = $10
 SFXDELAY        = $100
 
 FADESPEED       = $30

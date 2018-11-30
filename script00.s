@@ -7,6 +7,8 @@ FR_JUMP         = 9
 FR_DUCK         = 12
 FR_CLIMB        = 14
 
+FIREDELAY       = 3
+BULLETDURATION  = 22
 
                 include macros.s
                 include memory.s
@@ -17,13 +19,17 @@ FR_CLIMB        = 14
         ; Note! Code must be unambiguous! Relocated code cannot have skip1/skip2 -macros!
 
                 dc.w scriptEnd-scriptStart      ;Chunk data size
-                dc.b 2                          ;Number of objects
+                dc.b 6                          ;Number of objects
 
 scriptStart:
                 rorg scriptCodeRelocStart       ;Initial relocation address when loaded
 
                 dc.w MovePlayer                 ;$0000
                 dc.w DrawPlayer                 ;$0001
+                dc.w MoveBullet                 ;$0002
+                dc.w DrawBullet                 ;$0003
+                dc.w MoveSmokeCloud             ;$0004
+                dc.w DrawSmokeCloud             ;$0005
 
         ; Player actor move routine
         ;
@@ -31,10 +37,10 @@ scriptStart:
         ; Returns: -
         ; Modifies: A,Y,zeropage
 
-MovePlayer:     lda actMoveCtrl,x               ;Copy last frame's controls to previous
+MovePlayer:     lda actCtrl,x                   ;Copy last frame's controls to previous
                 sta actPrevCtrl,x
                 lda joystick                    ;Copy current frame's controls from joystick input
-                sta actMoveCtrl,x
+                sta actCtrl,x
                 sta currCtrl
                 ldy actState,x                  ;Check state (walking or climbing)
                 beq MP_UprightState
@@ -143,7 +149,7 @@ MP_WalkAnimSpeedPos:
                 lda #FR_WALK
 MP_StandAnim:
 MP_AnimDone:    sta actF1,x
-MP_AnimDone2:   rts
+MP_AnimDone2:   jmp MP_CheckAttack              ;Check firing after movement
 MP_InAirAnim:   ldy #FR_JUMP                    ;Choose jump animation frame based on absolute Y speed
                 lda actSY,x
                 bpl MP_InAirDown
@@ -165,7 +171,8 @@ MP_DuckAnim:    lda currCtrl
 MP_DuckAnimFrameOK:
                 lda #1
                 ldy #FR_DUCK+1
-                jmp OneShotAnimation
+                jsr OneShotAnimation
+                jmp MP_AnimDone2
 MP_DuckStandAnim:
                 lda #FR_DUCK
                 sta actF1,x
@@ -258,6 +265,42 @@ MP_ClimbAnimDown:
                 jsr MoveActorY
                 jmp NoInterpolation
 
+        ; Spawning bullets
+        
+MP_CheckAttack: lda actAttackD,x                ;Check if firedelay remaining
+                beq MP_NoAttackDelay
+                dec actAttackD,x                ;Can't fire again yet
+                rts
+MP_NoAttackDelay:
+                lda actCtrl,x                   ;Check for firebutton
+                and #JOY_FIRE
+                beq MP_NoAttack
+                jsr GetConnectPoint             ;Weapon muzzle offset to xLo,xHi,yLo,yHi
+                jsr GetFreeNonNPC               ;Find free actor for bullet
+                bcs MP_NoAttack                 ;Not found
+                lda #ACT_BULLET
+                jsr SpawnWithOffset             ;Create bullet actor
+                lda actD,x                      ;Firing actor's facing direction
+                pha
+                tya
+                tax                             ;Bullet actor index to X for actor init
+                jsr InitActor
+                pla
+                sta actD,x                      ;Copy facing from firing actor
+                cmp #$80
+                lda #15*8                       ;Set bullet speed either left or right according to facing
+                bcc MP_BulletRight
+                lda #-15*8
+MP_BulletRight: sta actSX,x
+                lda #BULLETDURATION
+                sta actTime,x                   ;Set bullet lifetime
+                lda #SFX_GUN
+                jsr QueueSfx                    ;Play firing sound
+                ldx actIndex                    ;Restore original actor index
+                lda #FIREDELAY
+                sta actAttackD,x                ;Set firedelay now as firing was successful
+MP_NoAttack:    rts
+
         ; Player actor draw routine. Also do scrolling
         ;
         ; Parameters: X Actor index
@@ -298,15 +341,77 @@ DP_SkipScroll:  ldy actF1,x                     ;Draw lower part sprite, followe
                 lda lowerFrameTbl,y
                 ldy #C_PLAYER
                 jsr DrawLogicalSpriteDir
+                ldx actIndex
                 ldy actF1,x
                 lda upperFrameTbl,y
                 ldy #C_PLAYER
                 jmp DrawLogicalSpriteDir
 
+        ; Bullet actor move routine.
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+MoveBullet:     lda actSX,x                     ;Move bullet according to its velocity
+                jsr MoveActorX
+                jsr GetBlockInfo                ;Check for collision with walls
+                and #BI_WALL
+                bne MB_HitWall
+                dec actTime,x                   ;Decrement time duration and remove when expired
+                beq MB_Remove
+                lda actF1,x
+                bne MB_AnimDone
+                inc actF1,x                     ;Animate from muzzleflash to actual bullet shape after 1st frame
+                jmp NoInterpolation             ;Do not interpolate on the muzzleflash frame
+MB_AnimDone:    rts
+MB_Remove:      jmp RemoveActor
+MB_HitWall:     lda #ACT_SMOKECLOUD             ;Transform into smokecloud & reset animation if hit wall
+                jmp TransformActor
+
+        ; Bullet actor draw routine.
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+DrawBullet:     ldy actF1,x
+                beq DB_NoFlicker
+                jsr SetFlickerColor             ;Make the bullet flicker after the muzzleflash frame
+DB_NoFlicker:   lda bulletFrameTbl,y
+                ldy #C_COMMON
+                jmp DrawLogicalSpriteDir
+
+        ; Smokecloud actor move routine.
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+MoveSmokeCloud: lda #0
+                ldy #1
+                jsr OneShotAnimation            ;Animate and remove after animation finishes (C=1)
+                bcs MB_Remove
+                rts
+
+        ; Smokecloud actor draw routine.
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+DrawSmokeCloud: jsr SetFlickerColor
+                lda actF1,x
+                clc
+                adc #10                         ;Frames 10,11 from the COMMON spritefile
+                ldy #C_COMMON
+                jmp DrawLogicalSprite
+
                 brk                             ;End relocation
 
 upperFrameTbl:  dc.b 1,  0,1,1,2,2,1,1,0,         0,0,0,    1,1,    15,14,13,14,15,16,17,16
 lowerFrameTbl:  dc.b 18, 19,20,21,22,23,24,25,26, 29,30,31, 27,28,  36,35,34,35,36,37,38,37
+bulletFrameTbl: dc.b 7,12
 
                 rend
 

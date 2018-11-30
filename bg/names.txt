@@ -1,0 +1,8 @@
+; Actor names
+PLAYER
+ITEM
+BULLET
+SMOKECLOUD
+end
+; Item names
+end

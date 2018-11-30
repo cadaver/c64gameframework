@@ -38,7 +38,7 @@ PF_FarEnough:   lda actNavArea,y
                 cmp actTargetNavArea,x
                 beq PF_GoToDestArea             ;Get new dest if target has changed area / was invalidated
                 jsr PF_FindDestNavArea
-PF_OldCtrl:     lda actMoveCtrl,x               ;Return old move controls to save CPU
+PF_OldCtrl:     lda actCtrl,x                   ;Return old move controls to save CPU
                 rts
 
 PF_GoToTarget:  lda actState,x
@@ -131,7 +131,9 @@ PF_UprightOutsidePlatform:
                 lda navAreaU,y
                 cmp actYH,x
                 bcs PF_UprightLeftOrRight
-                lda actMoveCtrl,x
+                lda actCtrl,x
+                and #JOY_LEFT|JOY_RIGHT
+                beq PF_UprightLeftOrRight       ;Must have sideways controls decided before jumping
                 ora #JOY_JUMP
                 rts
 PF_UprightLeftOrRight:
