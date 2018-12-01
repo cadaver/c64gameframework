@@ -19,17 +19,19 @@ BULLETDURATION  = 22
         ; Note! Code must be unambiguous! Relocated code cannot have skip1/skip2 -macros!
 
                 dc.w scriptEnd-scriptStart      ;Chunk data size
-                dc.b 6                          ;Number of objects
+                dc.b 8                          ;Number of objects
 
 scriptStart:
                 rorg scriptCodeRelocStart       ;Initial relocation address when loaded
 
                 dc.w MovePlayer                 ;$0000
                 dc.w DrawPlayer                 ;$0001
-                dc.w MoveBullet                 ;$0002
-                dc.w DrawBullet                 ;$0003
-                dc.w MoveSmokeCloud             ;$0004
-                dc.w DrawSmokeCloud             ;$0005
+                dc.w MoveItem                   ;$0002
+                dc.w DrawItem                   ;$0003
+                dc.w MoveBullet                 ;$0004
+                dc.w DrawBullet                 ;$0005
+                dc.w MoveSmokeCloud             ;$0006
+                dc.w DrawSmokeCloud             ;$0007
 
         ; Player actor move routine
         ;
@@ -297,8 +299,12 @@ MP_BulletRight: sta actSX,x
                 lda #SFX_GUN
                 jsr QueueSfx                    ;Play firing sound
                 ldx actIndex                    ;Restore original actor index
+                lda #FIREDELAY*2
+                ldy ammo                        ;Has ammo?
+                beq MP_NoAmmo                   ;If not, set slower firedelay
                 lda #FIREDELAY
-                sta actAttackD,x                ;Set firedelay now as firing was successful
+                dec ammo                        ;Decrement and set fast firedelay
+MP_NoAmmo:      sta actAttackD,x
 MP_NoAttack:    rts
 
         ; Player actor draw routine. Also do scrolling
@@ -347,6 +353,69 @@ DP_SkipScroll:  ldy actF1,x                     ;Draw lower part sprite, followe
                 ldy #C_PLAYER
                 jmp DrawLogicalSpriteDir
 
+        ; Item actor move routine
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+MoveItem:       lda actMB,x
+                bpl MI_InAir
+                lda actF1+ACTI_PLAYER           ;If player is crouching, check pickup
+                cmp #FR_DUCK+1
+                bne MI_NoPickup
+                ldy #ACTI_PLAYER                ;Check self against player actor
+                jsr CheckActorCollision
+                bcs MI_NoPickup
+                lda actF1,x                     ;Check type of item
+                beq MI_PickupHealth
+                bne MI_PickupAmmo
+MI_NoPickup:    jmp NoInterpolation             ;When item has settled, disable interpolation to reduce CPU use
+MI_InAir:       jmp MoveWithGravity             ;Moving item can't be picked up
+MI_PickupHealth:lda actHp+ACTI_PLAYER
+                cmp #100                        ;Check for max health
+                bcs MI_NoPickup
+                adc #25
+                cmp #100                        ;Clamp to max
+                bcc MI_HealthNotOver
+                lda #100
+MI_HealthNotOver:
+                sta actHp+ACTI_PLAYER
+MI_PickupDone:  lda #SFX_PICKUP                 ;Play pickup sound and remove self
+                jsr QueueSfx
+                jmp RemoveActor
+MI_PickupAmmo:  lda ammo
+                cmp #200                        ;Check for max. ammo
+                bcs MI_NoPickup
+                adc #25
+                cmp #200                        ;Clamp to max
+                bcc MI_AmmoNotOver
+                lda #200
+MI_AmmoNotOver: sta ammo
+                jmp MI_PickupDone
+
+        ; Item render
+        ;
+        ; Parameters: X actor index
+        ; Returns: -
+        ; Modifies: A,Y,various
+
+DrawItem:       lda frameNumber
+                lsr
+                lsr
+                and #$03
+                tay
+                lda itemFlashTbl,y
+                sta actColorOr                  ;Flash the item actor
+                lda #$00
+                sta actColorAnd                 ;Discard sprite's own color
+                lda #13
+DrawCommonSpriteWithFrame:
+                clc
+                adc actF1,x
+                ldy #C_COMMON
+                jmp DrawLogicalSprite
+
         ; Bullet actor move routine.
         ;
         ; Parameters: X Actor index
@@ -356,9 +425,13 @@ DP_SkipScroll:  ldy actF1,x                     ;Draw lower part sprite, followe
 MoveBullet:     lda actSX,x                     ;Move bullet according to its velocity
                 jsr MoveActorX
                 jsr GetBlockInfo                ;Check for collision with walls
+                tay
                 and #BI_WALL
-                bne MB_HitWall
-                dec actTime,x                   ;Decrement time duration and remove when expired
+                beq MB_NoWallHit
+                tya
+                jsr CheckInsideSlope            ;If has wall bit, also check the slope height for better accuracy
+                bcs MB_HitWall
+MB_NoWallHit:   dec actTime,x                   ;Decrement time duration and remove when expired
                 beq MB_Remove
                 lda actF1,x
                 bne MB_AnimDone
@@ -401,17 +474,15 @@ MoveSmokeCloud: lda #0
         ; Modifies: A,Y,zeropage
 
 DrawSmokeCloud: jsr SetFlickerColor
-                lda actF1,x
-                clc
-                adc #10                         ;Frames 10,11 from the COMMON spritefile
-                ldy #C_COMMON
-                jmp DrawLogicalSprite
+                lda #10
+                jmp DrawCommonSpriteWithFrame
 
                 brk                             ;End relocation
 
 upperFrameTbl:  dc.b 1,  0,1,1,2,2,1,1,0,         0,0,0,    1,1,    15,14,13,14,15,16,17,16
 lowerFrameTbl:  dc.b 18, 19,20,21,22,23,24,25,26, 29,30,31, 27,28,  36,35,34,35,36,37,38,37
 bulletFrameTbl: dc.b 7,12
+itemFlashTbl:   dc.b 8,10,15,10
 
                 rend
 

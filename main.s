@@ -62,22 +62,40 @@ MainLoop:       jsr ScrollLogic
                 jsr UpdateActors
                 jsr UpdateFrame
                 jsr UpdateLevelObjects
-                jsr RedrawHealth
+                jsr RedrawHUD
                 jmp MainLoop
 
-RedrawHealth:   lda actHp+ACTI_PLAYER           ;Redraw health to left side of scorepanel if changed
+RedrawHUD:      lda actHp+ACTI_PLAYER           ;Redraw health to left side of scorepanel if changed
                 cmp displayedHealth
-                beq RH_SameValue
+                beq RH_SameHealth
                 sta displayedHealth
                 jsr ConvertToBCD8
                 ldx #0
-                lda zpDestHi
+                pha
+                lda #94                         ;Health symbol
+                jsr PrintPanelChar
+                pla
+                jsr Print3BCDDigits             ;Health value
+RH_SameHealth:  lda ammo
+                cmp displayedAmmo
+                beq RH_SameAmmo
+                sta displayedHealth
+                jsr ConvertToBCD8
+                ldx #34
+                pha
+                lda #95                         ;Ammo symbol
+                jsr PrintPanelChar
+                pla
+                jsr Print3BCDDigits             ;Ammo value
+RH_SameAmmo:    rts
+
+Print3BCDDigits:lda zpDestHi
                 jsr PrintBCDDigit
                 lda zpDestLo
                 jmp PrintBCDDigits
-RH_SameValue:   rts
 
 displayedHealth:dc.b $ff
+displayedAmmo:  dc.b $ff
 
 randomAreaStart:
                 include raster.s
@@ -99,7 +117,7 @@ randomAreaEnd:
                 include actordata.s
                 include miscdata.s
                 include aligneddata.s
-                
+
         ; Dynamic allocation area begin
 
 fileAreaStart:

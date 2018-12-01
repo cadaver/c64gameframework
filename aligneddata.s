@@ -246,9 +246,10 @@ actDestNavArea: ds.b MAX_COMPLEXACT,0
 actHeight:      ds.b MAX_COMPLEXACT,0
 actAimHeight:   ds.b MAX_COMPLEXACT,0
 
-        ; Player current state (empty for now)
+        ; Player current state
 
 playerStateStart:
+ammo:           dc.b 0
 
 playerStateEnd:
 
