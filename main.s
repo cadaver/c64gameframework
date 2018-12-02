@@ -57,8 +57,7 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 jsr InitActor                   ;Init health & actor flags
                 jsr CenterPlayer                ;Center scrolling on player & redraw
 
-                jsr SaveLevelState              ;Make an "in-memory checkpoint" for restarting
-                jsr SavePlayerState
+                jsr SavePlayerState             ;Make an "in-memory checkpoint" for restarting
 
 MainLoop:       jsr ScrollLogic
                 jsr DrawActors
@@ -102,7 +101,7 @@ CheckRestart:   lda actT+ACTI_PLAYER            ;Check if player actor vanished 
                 sta restartDelay
                 jsr RestoreCheckpoint           ;Restore player & world state from last entered area & start again
                 lda actHp+ACTI_PLAYER
-                cmp #50                         ;Ensure at least half HP after restart
+                cmp #50                         ;Ensure at least half health after restart
                 bcs CR_HealthOK
                 lda #50
                 sta actHp+ACTI_PLAYER

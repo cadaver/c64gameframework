@@ -164,14 +164,14 @@ CL_SameLevel:   rts
 ChangeLevel:    sta loadTempReg
                 cmp levelNum
                 php
+                jsr BlankScreen
                 ldy autoDeactObj                ;If autodeactivating an object in the old zone, finish now
                 bmi CL_NoAutoDeact
                 jsr DeactivateObject
 CL_NoAutoDeact: jsr RemoveLevelActors
-                jsr BlankScreen
+                jsr SaveLevelState
                 plp
                 beq CL_SameLevel
-                jsr SaveLevelState
                 lda loadTempReg
                 sta levelNum
                 ldx #F_LEVEL
