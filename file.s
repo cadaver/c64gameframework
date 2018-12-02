@@ -381,20 +381,13 @@ SPS_Loop:       jsr GetSaveMiscVar
                 bpl SPS_Loop
                 ldx #<zpSrcLo
                 ldy #<zpDestLo
-CopySaveStateComplete:
-                lda #$00
-CopySaveState:  pha
-                clc
-                adc #<playerStateStart
+CopySaveState:  lda #<playerStateStart
                 sta $00,x
-                lda #$00
-                adc #>playerStateStart
+                lda #>playerStateStart
                 sta $01,x
-                pla
-                adc #<savePlayerState
+                lda #<savePlayerState
                 sta $00,y
-                lda #$00
-                adc #>savePlayerState
+                lda #>savePlayerState
                 sta $01,y
                 lda #<(playerStateEnd-playerStateStart)
                 sta zpBitsLo
