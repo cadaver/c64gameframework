@@ -1,11 +1,14 @@
 SCROLLCENTER_X  = 91
 SCROLLCENTER_Y  = 165
 
+STATE_DIE       = $ff                           ;For player only
+
 FR_STAND        = 0
 FR_WALK         = 1
 FR_JUMP         = 9
 FR_DUCK         = 12
 FR_CLIMB        = 14
+FR_DIE          = 22
 
 FIREDELAY       = 3
 BULLETDURATION  = 22
@@ -19,20 +22,26 @@ BULLETDURATION  = 22
         ; Note! Code must be unambiguous! Relocated code cannot have skip1/skip2 -macros!
 
                 dc.w scriptEnd-scriptStart      ;Chunk data size
-                dc.b 8                          ;Number of objects
+                dc.b 14                          ;Number of objects
 
 scriptStart:
                 rorg scriptCodeRelocStart       ;Initial relocation address when loaded
 
                 dc.w MovePlayer                 ;$0000
                 dc.w DrawPlayer                 ;$0001
-                dc.w MoveItem                   ;$0002
-                dc.w DrawItem                   ;$0003
-                dc.w MoveBullet                 ;$0004
-                dc.w DrawBullet                 ;$0005
-                dc.w MoveSmokeCloud             ;$0006
-                dc.w DrawSmokeCloud             ;$0007
-
+                dc.w DamagePlayer               ;$0002
+                dc.w MoveItem                   ;$0003
+                dc.w DrawItem                   ;$0004
+                dc.w MoveBullet                 ;$0005
+                dc.w DrawBullet                 ;$0006
+                dc.w MoveSmokeCloud             ;$0007
+                dc.w DrawSmokeCloud             ;$0008
+                dc.w MoveExplosion              ;$0009
+                dc.w DrawExplosion              ;$000a
+                dc.w MoveEnemy                  ;$000b
+                dc.w DrawEnemy                  ;$000c
+                dc.w DamageEnemy                ;$000d
+                
         ; Player actor move routine
         ;
         ; Parameters: X Actor index
@@ -45,8 +54,23 @@ MovePlayer:     lda actCtrl,x                   ;Copy last frame's controls to p
                 sta actCtrl,x
                 sta currCtrl
                 ldy actState,x                  ;Check state (walking or climbing)
+                bmi MP_DyingState
                 beq MP_UprightState
                 jmp MP_ClimbingState
+
+        ; Dying (spawn explosions)
+
+MP_DyingState:  jsr MoveWithGravity             ;Fall to ground, explode when landed
+                lda actMB,x
+                bmi MP_DyingFinalExplosion
+                dec actYH,x                     ;Reuse enemy explosion code, but adjust Y-coord to spawn from middle of player
+                jsr ME_SpawnExplosions
+                inc actYH,x
+                rts
+MP_DyingFinalExplosion:
+                lda #-8*8                       ;Lift final explosion up from the platform
+                jsr MoveActorY
+                jmp ME_FinalExplosion
 
         ; Upright movement (walk / jump / duck)
 
@@ -267,7 +291,7 @@ MP_ClimbAnimDown:
                 jsr MoveActorY
                 jmp NoInterpolation
 
-        ; Spawning bullets
+        ; Spawning bullets (used for both player & enemy)
         
 MP_CheckAttack: lda actAttackD,x                ;Check if firedelay remaining
                 beq MP_NoAttackDelay
@@ -284,9 +308,7 @@ MP_NoAttackDelay:
                 jsr SpawnWithOffset             ;Create bullet actor
                 lda actD,x                      ;Firing actor's facing direction
                 pha
-                tya
-                tax                             ;Bullet actor index to X for actor init
-                jsr InitActor
+                jsr InitSpawnedActor            ;Copy actor index from Y to X & init actor
                 pla
                 sta actD,x                      ;Copy facing from firing actor
                 cmp #$80
@@ -296,16 +318,24 @@ MP_NoAttackDelay:
 MP_BulletRight: sta actSX,x
                 lda #BULLETDURATION
                 sta actTime,x                   ;Set bullet lifetime
+                lda currFlags                   ;Copy group bits from firing actor (put to the ZP variable currFlags before calling move)
+                and #AF_GROUPFLAGS              ;to avoid bullets hurting self
+                ora actFlags,x
+                sta actFlags,x
                 lda #SFX_GUN
                 jsr QueueSfx                    ;Play firing sound
                 ldx actIndex                    ;Restore original actor index
-                lda #FIREDELAY*2
+                bne MP_EnemyFire                ;Enemy firing, or player?
+                lda #FIREDELAY*5/2
                 ldy ammo                        ;Has ammo?
                 beq MP_NoAmmo                   ;If not, set slower firedelay
                 lda #FIREDELAY
                 dec ammo                        ;Decrement and set fast firedelay
 MP_NoAmmo:      sta actAttackD,x
 MP_NoAttack:    rts
+MP_EnemyFire:   lda #FIREDELAY*2                ;Enemy has an intermediate fire rate
+                sta actAttackD,x
+                rts
 
         ; Player actor draw routine. Also do scrolling
         ;
@@ -353,6 +383,26 @@ DP_SkipScroll:  ldy actF1,x                     ;Draw lower part sprite, followe
                 ldy #C_PLAYER
                 jmp DrawLogicalSpriteDir
 
+        ; Player damage response routine
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+DamagePlayer:   lda actHp,x                     ;Ran out of health?
+                bne DP_HasHealth
+                lda #-7*8
+                sta actSY,x
+                lda #-1*8                       ;Lift off the ground, clear grounded flag, same as in normal jump
+                jsr MoveActorY
+                lda #$ff-MB_GROUNDED
+                jsr ClearMovementBits
+                lda #FR_DIE                     ;Set dying animation frame & state
+                sta actF1,x
+                lda #STATE_DIE
+                sta actState,x
+DP_HasHealth:   rts
+
         ; Item actor move routine
         ;
         ; Parameters: X Actor index
@@ -375,7 +425,7 @@ MI_InAir:       jmp MoveWithGravity             ;Moving item can't be picked up
 MI_PickupHealth:lda actHp+ACTI_PLAYER
                 cmp #100                        ;Check for max health
                 bcs MI_NoPickup
-                adc #25
+                adc #50
                 cmp #100                        ;Clamp to max
                 bcc MI_HealthNotOver
                 lda #100
@@ -394,7 +444,7 @@ MI_PickupAmmo:  lda ammo
 MI_AmmoNotOver: sta ammo
                 jmp MI_PickupDone
 
-        ; Item render
+        ; Item actor draw routine
         ;
         ; Parameters: X actor index
         ; Returns: -
@@ -416,7 +466,7 @@ DrawCommonSpriteWithFrame:
                 ldy #C_COMMON
                 jmp DrawLogicalSprite
 
-        ; Bullet actor move routine.
+        ; Bullet actor move routine
         ;
         ; Parameters: X Actor index
         ; Returns: -
@@ -431,18 +481,21 @@ MoveBullet:     lda actSX,x                     ;Move bullet according to its ve
                 tya
                 jsr CheckInsideSlope            ;If has wall bit, also check the slope height for better accuracy
                 bcs MB_HitWall
-MB_NoWallHit:   dec actTime,x                   ;Decrement time duration and remove when expired
+MB_NoWallHit:   jsr CheckBulletCollision        ;Collided to any damageable actor?
+                bcc MB_HasCollision             ;C=0 if did
+                dec actTime,x                   ;Decrement time duration and remove when expired
                 beq MB_Remove
                 lda actF1,x
                 bne MB_AnimDone
                 inc actF1,x                     ;Animate from muzzleflash to actual bullet shape after 1st frame
                 jmp NoInterpolation             ;Do not interpolate on the muzzleflash frame
 MB_AnimDone:    rts
+MB_HasCollision:jsr AddBulletDamage             ;Add damage (in actHp) to actor collided with
 MB_Remove:      jmp RemoveActor
 MB_HitWall:     lda #ACT_SMOKECLOUD             ;Transform into smokecloud & reset animation if hit wall
                 jmp TransformActor
 
-        ; Bullet actor draw routine.
+        ; Bullet actor draw routine
         ;
         ; Parameters: X Actor index
         ; Returns: -
@@ -455,7 +508,7 @@ DB_NoFlicker:   lda bulletFrameTbl,y
                 ldy #C_COMMON
                 jmp DrawLogicalSpriteDir
 
-        ; Smokecloud actor move routine.
+        ; Smokecloud actor move routine
         ;
         ; Parameters: X Actor index
         ; Returns: -
@@ -463,11 +516,12 @@ DB_NoFlicker:   lda bulletFrameTbl,y
 
 MoveSmokeCloud: lda #0
                 ldy #1
+OneShotAnimateAndRemove:
                 jsr OneShotAnimation            ;Animate and remove after animation finishes (C=1)
                 bcs MB_Remove
                 rts
 
-        ; Smokecloud actor draw routine.
+        ; Smokecloud actor draw routine
         ;
         ; Parameters: X Actor index
         ; Returns: -
@@ -477,12 +531,182 @@ DrawSmokeCloud: jsr SetFlickerColor
                 lda #10
                 jmp DrawCommonSpriteWithFrame
 
+        ; Explosion actor move routine
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+MoveExplosion:  lda #1
+                ldy #4
+                jmp OneShotAnimateAndRemove     ;Same as smokecloud, just different delay / amount of frames
+
+        ; Explosion actor draw routine
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+DrawExplosion:  lda #0
+                jmp DrawCommonSpriteWithFrame
+
+        ; Enemy actor move routine
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+MoveEnemy:      lda actHp,x                     ;If hitpoints zero, fall and spawn explosions randomly
+                beq ME_Exploding
+                inc actFd,x                     ;Animate
+                lda #0
+                ldy actXH,x                     ;Check if on left or right side of player
+                cpy actXH+ACTI_PLAYER
+                beq ME_NoHorizCtrl
+                bcc ME_MoveRight
+ME_MoveLeft:    ora #JOY_LEFT
+                bne ME_NoHorizCtrl
+ME_MoveRight:   ora #JOY_RIGHT
+ME_NoHorizCtrl: ldy actYH,x                     ;Check if above or below player's head
+                iny
+                iny
+                cpy actYH+ACTI_PLAYER
+                beq ME_CanFire
+                bcc ME_MoveDown
+ME_MoveUp:      ora #JOY_UP
+                bne ME_NoVertCtrl
+ME_MoveDown:    ora #JOY_DOWN
+                bne ME_NoVertCtrl
+ME_CanFire:     ldy actHp                       ;If at the level of player's head, can fire,
+                beq ME_NoVertCtrl               ;but skip if player dead
+                ora #JOY_FIRE
+ME_NoVertCtrl:  sta actCtrl,x
+                jsr AccelerateFlyer             ;Accelerate & move
+                jsr MoveFlyer
+                jmp MP_CheckAttack              ;Check firing (some controls have the firebutton held down)
+
+ME_Exploding:   jsr MoveWithGravity
+                lda actMB,x
+                bmi ME_FinalExplosion           ;When hit ground, turn into a self explosion
+ME_SpawnExplosions:
+                jsr Random
+                and #$7f
+                adc actTime,x
+                sta actTime,x
+                bcc ME_NoNewExplosion           ;Random probability for spawned explosion
+                jsr GetFreeNonNPC
+                bcs ME_NoNewExplosion           ;No room
+                lda #ACT_EXPLOSION
+                jsr SpawnActor
+                jsr InitSpawnedActor            ;Copy actor index from Y to X & init actor
+                ldx actIndex                    ;Restore own actorindex
+                bpl ME_ExplosionSound           ;And play sound for each spawned explosion
+ME_NoNewExplosion:
+                rts
+ME_FinalExplosion:
+                lda #ACT_EXPLOSION
+                jsr TransformActor
+ME_ExplosionSound:
+                lda #SFX_EXPLOSION
+                jmp QueueSfx
+
+        ; Enemy actor draw routine
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+DrawEnemy:      lda actFd,x
+                lsr
+                and #$07
+                tay
+                lda enemyFrameTbl,y
+                ldy #C_ENEMY
+                jmp DrawLogicalSprite
+
+        ; Enemy damage response
+        ;
+        ; Parameters: X Actor index
+        ; Returns: -
+        ; Modifies: A,Y,zeropage
+
+DamageEnemy:    rts                             ;Can be a no-op, AddDamage already decrements hitpoints and does damage flash
+
+        ; Accelerate flying enemy
+        ;
+        ; Parameters: X actor index
+        ; Returns: -
+        ; Modifies: A,Y,temp vars,loader temp vars
+
+AccelerateFlyer:lda actCtrl,x
+                and #JOY_LEFT|JOY_RIGHT
+                beq AF_NoHorizAccel
+                cmp #JOY_LEFT
+                beq AF_AccelLeft
+                clc
+AF_AccelLeft:   ldy #3*8                        ;Max. horiz speed
+                lda #4                          ;Acceleration
+                jsr AccActorXNegOrPos
+AF_NoHorizAccel:lda actCtrl,x
+                and #JOY_UP|JOY_DOWN
+                beq AF_NoVertAccel
+                cmp #JOY_UP
+                beq AF_AccelUp                 ;C=1 accelerate up (negative)
+                clc
+AF_AccelUp:     ldy #2*8                        ;Max. vert speed
+                lda #3                          ;Acceleration
+                jmp AccActorYNegOrPos
+AF_NoVertAccel: rts
+
+        ; Move flying enemy, but not into walls
+        ;
+        ; Parameters: X actor index
+        ; Returns: -
+        ; Modifies: A,Y,temp vars,loader temp vars
+
+MoveFlyer:      lda #$00
+                sta actMB,x
+                lda actSY,x
+                beq MF_NoVertMove
+                jsr MoveActorY
+                jsr GetBlockInfo
+                and #BI_WALL
+                beq MF_NoHitWallVertical
+                lda actSY,x
+                jsr MoveActorYNeg
+                lda #$00
+                sta actSY,x
+                lda #MB_HITWALL
+                sta actMB,x
+MF_NoHitWallVertical:
+MF_NoVertMove:
+                lda actSX,x
+                beq MF_NoHorizMove
+                pha
+                and #$80
+                sta actD,x                      ;Consider horiz. speed as the facing dir
+                pla
+                jsr MoveActorX
+                jsr GetBlockInfo
+                and #BI_WALL
+                beq MF_NoHitWallHorizontal
+                lda actSX,x
+                jsr MoveActorXNeg
+                lda #$00
+                sta actSX,x
+                lda #MB_HITWALL
+                sta actMB,x
+MF_NoHitWallHorizontal:
+MF_NoHorizMove:
+                rts
+
                 brk                             ;End relocation
 
-upperFrameTbl:  dc.b 1,  0,1,1,2,2,1,1,0,         0,0,0,    1,1,    15,14,13,14,15,16,17,16
-lowerFrameTbl:  dc.b 18, 19,20,21,22,23,24,25,26, 29,30,31, 27,28,  36,35,34,35,36,37,38,37
+upperFrameTbl:  dc.b 1,  0,1,1,2,2,1,1,0,         0,0,0,    1,1,    15,14,13,14,15,16,17,16,11
+lowerFrameTbl:  dc.b 18, 19,20,21,22,23,24,25,26, 29,30,31, 27,28,  36,35,34,35,36,37,38,37,32
 bulletFrameTbl: dc.b 7,12
 itemFlashTbl:   dc.b 8,10,15,10
+enemyFrameTbl:  dc.b 0,1,2,3,4,3,2,1
 
                 rend
 

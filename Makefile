@@ -7,7 +7,7 @@ clean:
 	del *sym.s
 	del *.d64
 
-example.d64: example.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak sprplayer.pak sprcommon.pak script00.pak
+example.d64: example.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak sprplayer.pak sprcommon.pak sprenemy.pak script00.pak
 	maked64 example.d64 example.seq EXAMPLE_GAME______EG_2A 10
 
 exampleef.crt: example.d64 example.seq main.pak loadsym.s mainsymcart.s efboot.s
@@ -60,6 +60,9 @@ sprcommon.pak: spr/common.spr.res
 
 sprplayer.pak: spr/player.spr.res
 	pchunk2 spr/player.spr.res sprplayer.pak
+
+sprenemy.pak: spr/enemy.spr.res
+	pchunk2 spr/enemy.spr.res sprenemy.pak
 
 script00.pak: script00.s mainsym.s macros.s memory.s
 	dasm script00.s -oscript00.bin -f3

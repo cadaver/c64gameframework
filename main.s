@@ -17,9 +17,11 @@ F_CHUNK         = $04-1
 
 C_COMMON        = 1                             ;Common sprites
 C_PLAYER        = 2                             ;Player sprites
-C_SCRIPT0       = 3                             ;First script (loadable code) file, with player movement / render code
+C_ENEMY         = 3                             ;Enemy sprites
+C_SCRIPT0       = 4                             ;First script (loadable code) file, with player + enemy movement / render code
 
-C_FIRSTPURGEABLE = C_PLAYER                     ;First chunk that can be removed from memory. Put e.g. always resident spritefiles to lower indices
+C_FIRSTPURGEABLE = C_PLAYER                     ;First chunk that can be removed from memory. Put e.g. always resident spritefiles 
+                                                ;to lower indices
 C_FIRSTSCRIPT   = C_SCRIPT0                     ;Remember to update this, otherwise sprite etc. resources will be relocated as code!
 
                 include memory.s
@@ -30,11 +32,15 @@ C_FIRSTSCRIPT   = C_SCRIPT0                     ;Remember to update this, otherw
 EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 txs
                 jsr InitAll                     ;Call to disposable init code
+
+                lda #5                          ;Adjust text margin for the health display
+                sta textLeftMargin
+
                 ldy #C_COMMON
                 jsr LoadResourceFile            ;Preload the common sprites
                 lda #1
-                jsr PlaySong
-                lda #0
+                jsr PlaySong                    ;Play music. Note: some music (even a silence tune)
+                lda #0                          ;needs to be initialized for sound effects to work
                 jsr ChangeLevel
                 lda #0
                 jsr ChangeZone
@@ -51,8 +57,8 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 jsr InitActor                   ;Init health & actor flags
                 jsr CenterPlayer                ;Center scrolling on player & redraw
 
-                lda #4                          ;Adjust text margin for the health display
-                sta textLeftMargin
+                jsr SaveLevelState              ;Make an "in-memory checkpoint" for restarting
+                jsr SavePlayerState
 
 MainLoop:       jsr ScrollLogic
                 jsr DrawActors
@@ -63,6 +69,7 @@ MainLoop:       jsr ScrollLogic
                 jsr UpdateFrame
                 jsr UpdateLevelObjects
                 jsr RedrawHUD
+                jsr CheckRestart
                 jmp MainLoop
 
 RedrawHUD:      lda actHp+ACTI_PLAYER           ;Redraw health to left side of scorepanel if changed
@@ -71,23 +78,36 @@ RedrawHUD:      lda actHp+ACTI_PLAYER           ;Redraw health to left side of s
                 sta displayedHealth
                 jsr ConvertToBCD8
                 ldx #0
-                pha
                 lda #94                         ;Health symbol
                 jsr PrintPanelChar
-                pla
                 jsr Print3BCDDigits             ;Health value
-RH_SameHealth:  lda ammo
+RH_SameHealth:  lda ammo                        ;Redraw ammo to right side of scorepanel if changed
                 cmp displayedAmmo
                 beq RH_SameAmmo
-                sta displayedHealth
+                sta displayedAmmo
                 jsr ConvertToBCD8
                 ldx #34
-                pha
                 lda #95                         ;Ammo symbol
                 jsr PrintPanelChar
-                pla
                 jsr Print3BCDDigits             ;Ammo value
 RH_SameAmmo:    rts
+
+CheckRestart:   lda actT+ACTI_PLAYER            ;Check if player actor vanished (destroyed)
+                bne CR_NoRestart
+                sta scrollSX                    ;Stop scrolling
+                sta scrollSY
+                dec restartDelay                ;Two second delay (50 mainloops or 100 frames)
+                bne CR_NoRestart
+                lda #50
+                sta restartDelay
+                jsr RestoreCheckpoint           ;Restore player & world state from last entered area & start again
+                lda actHp+ACTI_PLAYER
+                cmp #50                         ;Ensure at least half HP after restart
+                bcs CR_HealthOK
+                lda #50
+                sta actHp+ACTI_PLAYER
+CR_HealthOK:
+CR_NoRestart:   rts
 
 Print3BCDDigits:lda zpDestHi
                 jsr PrintBCDDigit
@@ -96,9 +116,11 @@ Print3BCDDigits:lda zpDestHi
 
 displayedHealth:dc.b $ff
 displayedAmmo:  dc.b $ff
+restartDelay:   dc.b 50
 
 randomAreaStart:
-                include raster.s
+
+                include raster.s                ;Include rest of the engine code
                 include sound.s
                 include input.s
                 include screen.s
@@ -110,9 +132,10 @@ randomAreaStart:
                 include physics.s
                 include ai.s
                 include level.s
+
 randomAreaEnd:
 
-                include playroutinedata.s
+                include playroutinedata.s       ;Include datas
                 include sounddata.s
                 include actordata.s
                 include miscdata.s
@@ -121,4 +144,4 @@ randomAreaEnd:
         ; Dynamic allocation area begin
 
 fileAreaStart:
-                include init.s
+                include init.s                  ;Disposable init code

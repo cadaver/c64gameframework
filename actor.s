@@ -515,6 +515,11 @@ MAX_Pos:        adc actXL,x
         ; Returns: -
         ; Modifies: A
 
+MoveActorYNegOrPos:
+                bpl MoveActorY
+MoveActorYNeg:  clc
+                eor #$ff
+                adc #$01
 MoveActorY:     cmp #$80
                 bcc MAY_Pos
 MAY_Neg:        clc
@@ -1143,13 +1148,15 @@ InitActor:      jsr GetActorData
                 jsr ResetSpeed                  ;C=1 on return if not complex
                 sta actF1,x
                 sta actFd,x
+                cpx #MAX_COMPLEXACT
                 bcs IA_NotComplex
-                sta actAttackD,x
+                sta actAttackD,x                ;"Complex" actors (players / enemies) have more variables
                 sta actCtrl,x
                 sta actPrevCtrl,x
                 sta actTarget,x
                 sta actNavArea,x
                 sta actDmgFlags,x
+                sta actState,x
                 lda #$ff
                 sta actTargetNavArea,x
                 rts
