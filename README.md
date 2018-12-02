@@ -5,7 +5,7 @@ Framework for multidirectionally scrolling games on the Commodore 64. Used in th
 Technical details:
 
 - 50Hz screen update, with actor update each second frame and interpolation of sprite movement
-- 22 visible scrolling rows (21 on unaccelerated NTSC), based on flexible screen redraw (color per char / color per block / skip color update)
+- 22 visible scrolling rows, based on flexible screen redraw (color per char / color per block / skip color update)
 - 24 sprite multiplexer
 - Realtime sprite depacking, using a sprite cache
 - Logical sprites which can consist of several physical sprites, and which can be X-expanded
@@ -14,6 +14,7 @@ Technical details:
 - [Miniplayer](https://github.com/cadaver/miniplayer) music & sound playback
 - Filter cutoff compensation on 8580 SID to make it sound more like 6581
 - Accelerated CPU mode on C128 & SuperCPU, activated in the vertical border
+- Optional reduction of scroll area to 21 rows on unaccelerated NTSC machines, due to less available CPU cycles per frame
 - Loader based on the CovertBitops Loader V2.24 (1541/1581/FD/HD/IDE64)
 - EasyFlash & GMOD2 mastering and save support
 - Exomizer2 compression
