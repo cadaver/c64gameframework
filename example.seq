@@ -1,5 +1,5 @@
 ; File directory order
-boot.prg EXAMPLEGAME
+boot.prg EXAMPLE
 loader.prg LO
 main.pak 00
 music00.pak 01
