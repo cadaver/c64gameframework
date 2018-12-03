@@ -2,7 +2,7 @@
 
 Framework for multidirectionally scrolling games on the Commodore 64. Used in the upcoming MW ULTRA game.
 
-Technical details:
+Features:
 
 - 50Hz screen update, with actor update each second frame and interpolation of sprite movement
 - 22 visible scrolling rows, based on flexible screen redraw (color per char / color per block / skip color update)
@@ -16,34 +16,34 @@ Technical details:
 - Accelerated CPU mode on C128 & SuperCPU, activated in the vertical border
 - Optional reduction of scroll area to 21 rows on unaccelerated NTSC machines, due to less available CPU cycles per frame
 - Loader based on the CovertBitops Loader V2.24 (1541/1581/FD/HD/IDE64)
-- EasyFlash & GMOD2 mastering and save support
+- EasyFlash & GMod2 mastering and save support
 - Exomizer2 compression
 
 Documentation and use example will be improved as an ongoing project.
 
+The example game implements a simplified sidescrolling platformer / shooter based on Steel Ranger assets. There's a player character and one type of enemy,
+collectable health and ammo, transitions from one area to other, and checkpoint save / restore to memory.
+
 See also [CovertBitops homepage](http://cadaver.github.io).
 
-## Example
+## Building
 
-The use example implements a simplified sidescrolling platformer / shooter based on Steel Ranger assets. There's a player character and one type of enemy,
-collectable health and ammo, transitions from one area to other, and checkpoint save / restore to memory.
+- The Makefile builds the example game as a .d64 image and EF / GMod2 .crt images. Utilities contained in the "tools" subdirectory must be in the path.
+- For rebuilding the utilities on Windows, the MinGW compiler suite is required
 
 ## Memory map
 
 - $0200-$02ff Fastloader sector buffer
-- $0334-$04f0 Loader resident code
-- $04f1-$4xxx Engine resident code and variables (grows as necessary)
+- $0334-$04fx Loader resident code
+- $04fx-$4xxx Engine resident code and variables (grows as necessary)
 - $4xxx-$cxxx Dynamic memory allocation area
 - $cxxx-$cxxx Zone depack buffer
 - $cxxx-$cfff Music allocation area
 - $d000-$dfff Sprite depacking cache
 - $e000-$e3ff Scorepanel charset and screen
-- $e400-$e7ff Block data
-- $e800-$efff Charset
-- $f000-$f0ff Block collision info
-- $f100-$f17f Block colors
-- $f180-$f1ff Charset animation code
-- $f200-$f23f Block animation frames
+- $e400-$e7ff Charset's block data
+- $e800-$efff Charset's char data
+- $f000-$f23f Rest of the per-charset data
 - $f240-$f7ff Misc var area 1
 - $f800-$fc00 Game screen
 - $fc00-$fc3f Empty sprite
