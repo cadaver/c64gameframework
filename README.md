@@ -32,70 +32,73 @@ collectable health and ammo, transitions from one area to other, and checkpoint 
 
 ### General
 
-F1 Load shapes
-F2 Save shapes
-F3 Import 4x4 blocks to shapes
-F5 Shape editor
-F6 Map editor
-F7 Zone (area) aditor
-F8 Object / actor placement editor
-F9 Load world
-F10 Save world
-F11 Export world as .png image
-F12 Erase charset
-ESC Quit
+- F1 Load shapes
+- F2 Save shapes
+- F3 Import 4x4 blocks to shapes
+- F5 Shape editor
+- F6 Map editor
+- F7 Zone (area) aditor
+- F8 Object / actor placement editor
+- F9 Load world
+- F10 Save world
+- F11 Export world as .png image
+- F12 Erase charset
+- ESC Quit
 
 ### Shape editor
 
-LMB Draw with current color
-RMB Erase
-MMB Select char / block within shape
-Space Select part of shape
-Tab Select charset (shift + Tab to select backward)
-Arrows Scroll shape zoomed view
-Ctrl + arrows Edit shape size
-Shift + arrows Scroll char
-, . or Z X Select shape
-P Put char / partial shape to copybuffer
-T Take char / partial shape from copybuffer
-Q W Select current zone (to check multicolors)
-L Locked edit mode, all similar chars within all shapes will be affected
-G Pick color
-R Reverse char
-C Clear char
-F Fill char with current color
-V B N Char color swaps (press with Shift for different swaps)
-I Show collision info
-S Cycle through slope types
-1-8 Edit collision info (per 2x2 block within shape)
-Ctrl + 0-8 Change char color
-Shift + 1-4 Select color to draw with
-Shift + P Put whole shape to copybuffer
-Shift + T Take whole shape from copybuffer
-Shift + F Fill shape with current color
-Shift + Ctrl + 0-8 Change whole shape char color
-Shift + Backspace Reset shape
-Shift + Ins Insert shape
-Shift + Del Delete shape
+- LMB Draw with current color
+- RMB Erase
+- MMB Select char / block within shape
+- Space Select part of shape
+- Tab Select charset (shift+Tab to select backward)
+- Arrows Scroll shape zoomed view
+- Ctrl+arrows Edit shape size
+- Shift+arrows Scroll char
+- , . or Z X Select shape
+- P Put char / partial shape to copybuffer
+- T Take char / partial shape from copybuffer
+- Q W Select current zone (to check multicolors)
+- L Locked edit mode, all similar chars within all shapes will be affected
+- G Pick color
+- R Reverse char
+- C Clear char
+- F Fill char with current color
+- V B N Char color swaps (press with Shift for different swaps)
+- I Show collision info
+- S Cycle through slope types
+- 1-8 Edit collision info (per 2x2 block within shape)
+- Ctrl+0-8 Change char color
+- Shift+1-4 Select color to draw with
+- Shift+P Put whole shape to copybuffer
+- Shift+T Take whole shape from copybuffer
+- Shift+F Fill shape with current color
+- Shift+Ctrl+0-8 Change whole shape char color
+- Shift+Backspace Reset shape
+- Shift+Ins Insert shape
+- Shift+Del Delete shape
 
 ### Map editor
 
-LMB Place current shape
-RMB or Space Mark areas
-Shift+LMB Erase shapes
-Tab Select charset (shift + Tab to select backward)
-Arrows Scroll map (faster with Shift)
-B Shape selection screen
-I Show collision info
-O Show block optimization types (color per char, color per block, optimize colorwrite away)
-N Show navareas
-V Zoom out / in
-G Pick shape
-P Put area to copybuffer
-T Take area from copybuffer
-F Select zone fill shape (Shift + F to select backward)
-Shift+C Erase all shapes from current zone
-Shift+D Erase all instances of shape from current zone
+- LMB Place current shape
+- RMB or Space Mark areas
+- Shift+LMB Erase shapes
+- Tab Select charset (shift+Tab to select backward)
+- Arrows Scroll map (faster with Shift)
+- B Shape selection screen
+- I Show collision info
+- O Show block optimization types (color per char, color per block, optimize colorwrite away)
+- N Show navareas
+- V Zoom out / in
+- G Pick shape
+- P Put area to copybuffer
+- T Take area from copybuffer
+- F Select zone fill shape (Shift+F to select backward)
+- Shift+C Erase all shapes from current zone
+- Shift+D Erase all instances of shape from current zone
+
+### Zone editor
+
 
 ## License
 
