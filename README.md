@@ -28,6 +28,27 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 The use example implements a simplified sidescrolling platformer / shooter based on Steel Ranger assets. There's a player character and one type of enemy,
 collectable health and ammo, transitions from one area to other, and checkpoint save / restore to memory.
 
+## Memory map
+
+- $0200-$02ff Fastloader sector buffer
+- $0334-$04f0 Loader resident code
+- $04f1-$4xxx Engine resident code and variables (grows as necessary)
+- $4xxx-$cxxx Dynamic memory allocation area
+- $cxxx-$cxxx Zone depack buffer
+- $cxxx-$cfff Music allocation area
+- $d000-$dfff Sprite depacking cache
+- $e000-$e3ff Scorepanel charset and screen
+- $e400-$e7ff Block data
+- $e800-$efff Charset
+- $f000-$f0ff Block collision info
+- $f100-$f17f Block colors
+- $f180-$f1ff Charset animation code
+- $f200-$f23f Block animation frames
+- $f240-$f7ff Misc var area 1
+- $f800-$fc00 Game screen
+- $fc00-$fc3f Empty sprite
+- $fc40-$fff9 Misc var area 2
+
 ## World editor (worlded3) controls
 
 ### General
@@ -48,10 +69,10 @@ collectable health and ammo, transitions from one area to other, and checkpoint 
 ### Shape editor
 
 - LMB Draw with current color
-- RMB Erase
+- RMB Erase pixels
 - MMB Select char / block within shape
-- Space Select part of shape
-- Tab Select charset (shift+Tab to select backward)
+- Space Select rectangular area
+- Tab Select charset (Shift+Tab to select backward)
 - Arrows Scroll shape zoomed view
 - Ctrl+arrows Edit shape size
 - Shift+arrows Scroll char
@@ -59,7 +80,7 @@ collectable health and ammo, transitions from one area to other, and checkpoint 
 - P Put char / partial shape to copybuffer
 - T Take char / partial shape from copybuffer
 - Q W Select current zone (to check multicolors)
-- L Locked edit mode, all similar chars within all shapes will be affected
+- L Toggle locked edit mode, all similar chars within all shapes will be affected
 - G Pick color
 - R Reverse char
 - C Clear char
@@ -83,7 +104,7 @@ collectable health and ammo, transitions from one area to other, and checkpoint 
 - LMB Place current shape
 - RMB or Space Mark areas
 - Shift+LMB Erase shapes
-- Tab Select charset (shift+Tab to select backward)
+- Tab Select zone charset (Shift+Tab to select backward)
 - Arrows Scroll map (faster with Shift)
 - B Shape selection screen
 - I Show collision info
@@ -99,6 +120,80 @@ collectable health and ammo, transitions from one area to other, and checkpoint 
 
 ### Zone editor
 
+- LMB Select zone
+- RMB Expand zone
+- Shift+RMB (at zone edge) Shrink zone
+- , . or Z X Select zone
+- U Select next unused zone
+- Tab Select zone charset (Shift+Tab to select backward)
+- L Select level in which zone belongs (Shift+L to select backward)
+- F Select zone fill shape (Shift+F to select backward)
+- G Go to current zone's location
+- Shift+Del Erase zone
+- Shift+R Relocate zone
+- Ctrl+Shift+R Relocate whole world
+- Ctrl+Ins Change level of all zones forward past current
+- Ctrl+Del Change level of all zones backward past current
+
+### Object / actor editor
+
+- LMB Place object
+- RMB Place actor
+- , . or Z X Select actor type (faster with Shift)
+- I Switch between actors & items
+- 0-9 A-F Object data hex edit
+- Enter Go to / leave object data edit mode (when cursor over object)
+- 1 2 Edit actor databyte (weapon / item count)
+- 3 4 Edit actor databyte fast
+- 5 6 Edit actor type
+- D Toggle actor dir left/right / toggle object autodeactivation
+- H Toggle actor hidden flag
+- F Edit object animation frame count
+- M Edit object activation mode
+- T Edit object type
+- X Edit object X-size (Shift+X to edit backward)
+- Y Edit object Y-size (Shift+Y to edit backward)
+- Del Erase actor or object
+
+## Sprite editor (spred3) controls
+
+- F1 Load sprites
+- F2 Save sprites
+- F3 Import Steel Ranger sprites
+- F4 Import Hessian / Metal Warrior 4 sprites
+- ESC Quit
+- LMB Draw with current color
+- RMB Erase pixels
+- Space Mark areas
+- , . Select sprite
+- A Add collision axis-aligned box. Hold to adjust size for new box, or press on existing box to edit properties (Shift+A to remove)
+- S Add physical sprite. Press on existing box to edit color (Shift+S to remove)
+- X Flip sprite horizontally
+- Y Flip sprite vertically
+- W Toggle X-expand of physical sprite
+- U Undo
+- V B N Sprite color swaps
+- F Floodfill
+- L Draw line
+- H Place sprite hotspot
+- J Place sprite connect-spot
+- P Put marked area to copybuffer as brush
+- T Draw with brush
+- Ctrl+T Erase brush
+- 1-8 Edit test sprites (select, position, frame)
+- Del Erase sprite
+- Ins Insert sprite
+- Arrows Scroll view
+- Shift+1-4 Select color to draw with
+- Shift+arrows Scroll sprite
+- Shift+C Clear sprite
+- Shift+J Clear connect-spot
+- Shift+P Put sprite to copybuffer
+- Shift+T Take sprite from copybuffer
+- Shift+X Toggle sprite's "store flipped" mode. If a sprite is stored flipped, depacking it facing left for display is faster.
+
+Note: sprites will be saved both in editor's own format (for further editing) and C64 resource format (.res files). In projects,
+it is recommended to put both under version control.
 
 ## License
 
