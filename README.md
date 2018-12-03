@@ -121,7 +121,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 ### Zone editor
 
 - LMB Select zone
-- RMB Expand zone
+- RMB Create or expand zone
 - Shift+RMB (at zone edge) Shrink zone
 - , . or Z X Select zone
 - U Select next unused zone
