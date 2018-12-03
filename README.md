@@ -29,7 +29,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 ## Building
 
 - The Makefile builds the example game as a .d64 image and EF / GMod2 .crt images. Utilities contained in the "tools" subdirectory must be in the path.
-- For rebuilding the utilities on Windows, the MinGW compiler suite is required
+- For rebuilding the utilities on Windows, the MinGW compiler suite is required.
 
 ## Memory map
 

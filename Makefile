@@ -6,6 +6,7 @@ clean:
 	del *.tbl
 	del *sym.s
 	del *.d64
+	del *.crt
 
 example.d64: example.seq boot.prg loader.prg main.pak music00.pak level00.pak charset00.pak sprplayer.pak sprcommon.pak sprenemy.pak script00.pak
 	maked64 example.d64 example.seq EXAMPLE_GAME______EG_2A 10
