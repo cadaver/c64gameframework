@@ -237,13 +237,14 @@ UF_SortNoSwap2: inx
 UF_SortEndCmp:  cpx #MAX_SPR
                 bne UF_SortLoop
 
-UF_SortDone:    cli                             ;Wait for previous sprite update & screen redraw to complete
-                lda #$01                        ;Ensure IRQs are on to avoid getting stuck
+UF_SortDone:    dec $d019                       ;Ensure IRQs are on to avoid getting stuck, but if we disabled IRQs due to loading,
+                lda #$01                        ;make sure there's no IRQ to be executed immediately
                 sta $d01a
+                cli
                 if SHOW_FREE_TIME > 0
                 dec $d020
                 endif
-UF_WaitSprites: lda newFrameFlag
+UF_WaitSprites: lda newFrameFlag                ;Wait for previous sprite update & screen redraw to complete
                 ora drawScreenFlag
                 bmi UF_WaitSprites
                 if SHOW_FREE_TIME > 0
