@@ -164,7 +164,7 @@ int main(int argc, char **argv)
         printf("Could not open outfile\n");
         return 1;
     }
-    fwrite(cart, maxsize, 1, out);
+    fwrite(cart, 0x100000, 1, out);
     fclose(out);
     printf("Cart image written, %d bytes\n", maxsize);
     return 0;
