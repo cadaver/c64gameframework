@@ -167,7 +167,7 @@ PrS_NoFadeWait: lda #$ff
 PrS_Error:      jsr RetryPrompt
 PrS_Retry:      jsr OpenFile                    ;Music files are raw Exomizer2 output,
                 jsr GetByte                     ;meaning they start with startaddress hi/lo
-                bcs PrS_Retry
+                bcs PrS_Error
 PrS_NoError:    sta musicDataHi                 ;Reset zonebuffer ptr. now
                 sta zoneBufferHi
                 jsr GetByte

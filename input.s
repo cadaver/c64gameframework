@@ -86,7 +86,10 @@ GC_ButtonTwoDown:
                 bpl GC_AddJump
 GC_ButtonTwoUp: bmi GC_NoJump
 
-GetControls:    lda joystick
+GetControls:    lda #$01                        ;Make sure IRQs are on, as we must be in an interactive loop now
+                sta $d01a                       ;(either game loop, or an I/O error retry prompt)
+                cli
+                lda joystick
                 sta prevJoy
                 lda #$ff
                 sta keyType

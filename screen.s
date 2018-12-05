@@ -237,7 +237,7 @@ UF_SortNoSwap2: inx
 UF_SortEndCmp:  cpx #MAX_SPR
                 bne UF_SortLoop
 
-UF_SortDone:    lda #$01
+UF_SortDone:    lda #$01                        ;Make sure IRQs are on to prevent getting stuck in the wait below
                 sta $d01a
                 cli
                 if SHOW_FREE_TIME > 0
