@@ -237,8 +237,7 @@ UF_SortNoSwap2: inx
 UF_SortEndCmp:  cpx #MAX_SPR
                 bne UF_SortLoop
 
-UF_SortDone:    dec $d019                       ;Ensure IRQs are on to avoid getting stuck, but if we disabled IRQs due to loading,
-                lda #$01                        ;make sure there's no IRQ to be executed immediately
+UF_SortDone:    lda #$01
                 sta $d01a
                 cli
                 if SHOW_FREE_TIME > 0
