@@ -270,8 +270,7 @@ OF_SaveLoop:    cmp $8000,x
                 beq OF_SaveFound
                 inx
                 bne OF_SaveLoop
-                stx loadBufferPos               ;Savefile doesn't exist, close file & restore 01 value
-                dec fileOpen
+                dec fileOpen                    ;Savefile doesn't exist, close file
                 beq GB_MoreSectors
 OF_SaveFound:   txa
                 and #$1f
@@ -340,6 +339,7 @@ CopyEasyAPI:    lda $b800,x                     ;Copy EasyAPI to RAM
                 jsr SilenceSID
                 sta $d01a
                 sta $d011
+                sta fileOpen                    ;Preserve/erase needs to open further files, so clear fileopen flag already (IRQs disabled, no risk of reentering turbo mode)
                 jsr EasyAPIInit                 ;Init EasyAPI
                 bcc SaveInitOK
                 lda #$02
@@ -350,7 +350,6 @@ SaveExit:       lda #EASYFLASH_16K+EASYFLASH_LED ;Restore LED
                 sta $de02
                 lda loadTempReg
                 sta $01                         ;Restore $01 value
-                dec fileOpen
                 rts                             ;Done!
 
 SaveFileSub:    lda firstSaveBank
@@ -435,18 +434,19 @@ SavePreserveAndErase:
                 lda #>saveRamStart
                 sta zpDestHi
                 ldx #FIRSTSAVEFILE
-                stx fileNumber
 SavePreserveFiles:
+                stx fileNumber
+                lda #$00
+                sta zpBitsLo
+                sta zpBitsHi                    ;Current file length
                 cpx saveFileNumber
-                beq SavePreserveSkip            ;Do not preserve the file we'll overwrite now
+                beq SavePreserveFileEnd         ;Do not preserve the file we'll overwrite now
                 jsr OpenFile
-                ldy #$00
-                sty zpBitsLo
-                sty zpBitsHi                    ;Current file length
                 lda zpDestLo
                 sta saveFileAdrLo-FIRSTSAVEFILE,x
                 lda zpDestHi
                 sta saveFileAdrHi-FIRSTSAVEFILE,x
+                ldy #$00
 SavePreserveFileLoop:
                 jsr GetByte
                 bcs SavePreserveFileEnd
@@ -456,9 +456,8 @@ SavePreserveFileLoop:
                 inc zpDestHi
 SavePreserveNotOver:
                 inc zpBitsLo
-                bne SavePreserveNotOver2
+                bne SavePreserveFileLoop
                 inc zpBitsHi
-SavePreserveNotOver2:
                 bne SavePreserveFileLoop
 SavePreserveFileEnd:
                 ldx fileNumber
@@ -466,11 +465,8 @@ SavePreserveFileEnd:
                 sta saveFileLenLo-FIRSTSAVEFILE,x
                 lda zpBitsHi
                 sta saveFileLenHi-FIRSTSAVEFILE,x
-SavePreserveSkip:
-                inc fileNumber
-                ldx fileNumber
-                cpx #FIRSTSAVEFILE+MAXSAVEFILES
-                bne SavePreserveFiles
+                inx
+                bpl SavePreserveFiles
                 lda firstSaveBank               ;Erase save sector now
                 ldy #$80
                 jsr $df83
@@ -478,8 +474,8 @@ SavePreserveSkip:
                 sta fileNumber
                 jsr SaveFileSub                 ;Proceed to save the current file first
                 ldx #FIRSTSAVEFILE
-                stx fileNumber                  ;Then save all preserved files
 SavePreservedFiles:
+                stx fileNumber                  ;Then save all preserved files with nonzero length
                 lda saveFileLenLo-FIRSTSAVEFILE,x
                 ora saveFileLenHi-FIRSTSAVEFILE,x
                 beq SavePreservedFileSkip
@@ -495,8 +491,7 @@ SavePreservedFiles:
 SavePreservedFileSkip:
                 ldx fileNumber
                 inx
-                cpx #FIRSTSAVEFILE+MAXSAVEFILES
-                bcc SavePreservedFiles
+                bpl SavePreservedFiles
                 rts
 
 saveFileAdrLo:  ds.b MAXSAVEFILES,0
@@ -516,7 +511,7 @@ saveCodeEnd:    ds.b $f800-saveCodeEnd,$ff
                 org $fb00
 
                 dc.b $65,$66,$2d,$6e,$41,$4d,$45,$3a
-                dc.b "examplegame",0,0,0,0,0
+                dc.b "example game",0,0,0,0
 
 cartNameEnd:    ds.b $fffa-cartNameEnd,$ff
 

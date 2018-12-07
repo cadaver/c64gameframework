@@ -156,6 +156,7 @@ int main(int argc, char **argv)
     savestartoffset = (maxsize + 0x1ffff) & 0xfffe0000;
     cart[0x01ff] = (savestartoffset >> 14); // Save start bank
     memset(cart+savestartoffset, 0xff, 0x20000);
+    memset(cart+savestartoffset, 0x00, 0x100); // Make a "full" save directory, so that we will erase it as the first thing
     maxsize += 0x20000;
 
     FILE* out = fopen(argv[3], "wb");
