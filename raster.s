@@ -329,11 +329,11 @@ Irq4_Irq5Line:  ldy #IRQ5_LINE                  ;Advance if file is open
                 lda fileOpen
                 beq Irq4_NoAdvance
                 dey
-Irq4_NoAdvance: lda #<Irq5                      ;Back to first IRQ
+Irq4_NoAdvance: lda #<Irq5
                 ldx #>Irq5
                 jmp SetNextIrq
 
-        ; Raster interrupt 5. Show gamescreen
+        ; Raster interrupt 5. Show scorepanel
 
 Irq5:           cld
                 inc $01                         ;Ensure access to IO memory
