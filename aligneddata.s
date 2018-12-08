@@ -69,7 +69,7 @@ fixupSubTbl:    dc.b $00,$01,$81
                 dc.b $40+43,$40+44,0
                 dc.b 0,$40+43,$40+44
 
-irq4DelayTbl:   dc.b 5,5,5,5,3,0,5,5
+irq4DelayTbl:   dc.b 8,8,8,8,8,5,0,8
 reverseBitTbl:  dc.b $ff-$01,$ff-$02,$ff-$04,$ff-$08,$ff-$10,$ff-$20,$ff-$40,$ff-$80
 
                 org nextSliceTbl+$80

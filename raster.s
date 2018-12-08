@@ -1,6 +1,6 @@
 IRQ1_LINE       = MIN_SPRY-12
 IRQ3_LINE       = SCROLLROWS*8-39
-IRQ4_LINE       = SCROLLROWS*8+44
+IRQ4_LINE       = SCROLLROWS*8+45
 IRQ5_LINE       = 237
 
 TURBO_LINE      = 247
@@ -222,6 +222,10 @@ Irq2_SprJump:   jmp Irq2_Spr0
 
 Irq2_AllDone:
 Irq2_Irq4Line:  ldy #IRQ4_LINE
+                lda fileOpen
+                beq Irq2_AllDoneNoLoad          ;If loading, execute panelsplit IRQ one line earlier
+                dey
+Irq2_AllDoneNoLoad:
                 lda $d012
 Irq2_Irq4LineSafety:
                 cmp #IRQ4_LINE-IRQLATE_SAFETY_MARGIN
@@ -302,21 +306,34 @@ Irq4:           inc $01                         ;Ensure access to IO memory
                 stx irqSaveX
                 sty irqSaveY
 Irq4_Direct:    ldy $d011
-Irq4_Irq4Line:  lda #IRQ4_LINE
-Irq4_Wait:      cmp $d012
+Irq4_Irq4Line:  ldx #IRQ4_LINE
+Irq4_Wait:      cpx $d012
                 bcs Irq4_Wait
                 ldx irq4DelayTbl-$10,y
-                beq Irq4_BadLine
-                lda $d011                      ;If no badline, stabilize Y-scroll first
-                ora #$07
-                sta $d011
-                nop
-Irq4_BadLine:   lda #$57
-                ldy #PANEL_D018
 Irq4_Delay:     dex
                 bpl Irq4_Delay
+                lda #$57
                 sta $d011
-                sty $d018
+                lda #PANEL_D018
+                sta $d018
+                lsr newFrameFlag                ;Can update sprite doublebuffer now
+Irq4_Irq5Line:  ldy #IRQ5_LINE                  ;Advance for next IRQ if file is open
+                lda fileOpen
+                beq Irq4_NoAdvance
+                dey
+Irq4_NoAdvance: lda #<Irq5                      ;Back to first IRQ
+                ldx #>Irq5
+                jmp SetNextIrq
+
+        ; Raster interrupt 5. Show scorepanel, play music, animate charset
+
+Irq5:           inc $01                         ;Ensure access to IO memory
+                sta irqSaveA
+                stx irqSaveX
+                lda #$17
+Irq5_Irq5Line:  ldx #IRQ5_LINE
+Irq5_Wait:      cpx $d012
+                bcs Irq5_Wait
                 lda #$00
                 sta $d015                       ;Make sure sprites are off for the panel / bottom of screen
                 sta $d021
@@ -324,29 +341,14 @@ Irq4_Delay:     dex
                 sta $d022
                 lda #PANEL_BG2
                 sta $d023
-                lsr newFrameFlag                ;Can update sprite doublebuffer now
-Irq4_Irq5Line:  ldy #IRQ5_LINE                  ;Advance if file is open
-                lda fileOpen
-                beq Irq4_NoAdvance
-                dey
-Irq4_NoAdvance: lda #<Irq5
-                ldx #>Irq5
-                jmp SetNextIrq
-
-        ; Raster interrupt 5. Show scorepanel
-
-Irq5:           cld
-                inc $01                         ;Ensure access to IO memory
-                sta irqSaveA
-                stx irqSaveX
+                cld
                 sty irqSaveY
-Irq5_Irq5Line:  lda #IRQ5_LINE
-Irq5_Wait:      cmp $d012
-                bcs Irq5_Wait
-                lda #$17                        ;Fixed X-scrolling
-                sta $d016
                 lda #$17
-                sta $d011
+                sta $d016                       ;Fixed X-scrolling
+                pha                             ;Delay to hide $d011 write into the sideborder
+                pla
+                bit $00
+                sta $d011                       ;Screen on
 Irq5_SfxNum:    ldy #$00                        ;Play a new sound this frame?
                 beq Irq5_SfxDone
                 lda soundMode                   ;Check for sounds disabled
