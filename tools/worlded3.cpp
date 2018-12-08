@@ -332,6 +332,7 @@ int findnearestzone(int x, int y);
 int findnavarea(const Zone& zone, int x, int y);
 bool checkzonelegal(int num, int newx, int newy, int newsx, int newsy);
 void movezonetiles(Zone& zone, int xadd, int yadd);
+void movezoneobjects(Zone& zone, int xadd, int yadd);
 void editactors();
 void setmulticol(unsigned char& data, int x, unsigned char bits);
 void setsinglecol(unsigned char& data, int x, unsigned char bits);
@@ -2745,6 +2746,9 @@ void editzone()
             {
                 if (checkzonelegal(zonenum, x, y, zone.sx, zone.sy))
                 {
+                    int ofsx = x - zone.x;
+                    int ofsy = y - zone.y;
+                    movezoneobjects(zone, ofsx, ofsy);
                     zone.x = x;
                     zone.y = y;
                 }
@@ -2767,6 +2771,7 @@ void editzone()
                 {
                     for (int z = 0; z < NUMZONES; ++z)
                     {
+                        movezoneobjects(zones[z], ofsx, ofsy);
                         zones[z].x += ofsx;
                         zones[z].y += ofsy;
                     }
@@ -2852,12 +2857,10 @@ void editzone()
                     {
                         int oldx = zone.x;
                         int oldy = zone.y;
-
                         zone.x = nx;
                         zone.y = ny;
                         zone.sx = nsx;
                         zone.sy = nsy;
-
                         movezonetiles(zone, oldx-nx, oldy-ny);
                     }
                 }
@@ -2867,7 +2870,6 @@ void editzone()
                     {
                         zone.x += SCREENSIZEX;
                         zone.sx -= SCREENSIZEX;
-
                         movezonetiles(zone, -SCREENSIZEX, 0);
                     }
                     else if (x == zone.x + zone.sx - 1 && zone.sx > SCREENSIZEX)
@@ -2876,7 +2878,6 @@ void editzone()
                     {
                         zone.y += SCREENSIZEY;
                         zone.sy -= SCREENSIZEY;
-
                         movezonetiles(zone, 0, -SCREENSIZEY);
                     }
                     else if (y == zone.y + zone.sy - 1 && zone.sy > SCREENSIZEY)
@@ -3412,6 +3413,26 @@ void movezonetiles(Zone& zone, int xadd, int yadd)
     {
         zone.tiles[t].x += xadd;
         zone.tiles[t].y += yadd;
+    }
+}
+
+void movezoneobjects(Zone& zone, int xadd, int yadd)
+{
+    for (int c = 0; c < NUMLVLOBJ; ++c)
+    {
+        if (objects[c].sx && objects[c].sy && isinsidezone(objects[c].x, objects[c].y, zone))
+        {
+            objects[c].x += xadd;
+            objects[c].y += yadd;
+        }
+    }
+    for (int c = 0; c < NUMLVLACT; ++c)
+    {
+        if (actors[c].t && isinsidezone(actors[c].x, actors[c].y, zone))
+        {
+            actors[c].x += xadd;
+            actors[c].y += yadd;
+        }
     }
 }
 
