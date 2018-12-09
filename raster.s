@@ -321,10 +321,11 @@ Irq4_Delay:     dex
                 lda #PANEL_D018
                 sta $d018
                 lsr newFrameFlag                ;Can update sprite doublebuffer now
-                lda fileOpen
-                bne Irq5_Direct                 ;If file open, busywait instead of exiting IRQ
 Irq4_Irq5Line:  ldy #IRQ5_LINE
-                lda #<Irq5                      
+                lda fileOpen
+                beq Irq4_Irq5NoLoad             ;If file open, take one line advance
+                dey
+Irq4_Irq5NoLoad:lda #<Irq5
                 ldx #>Irq5
                 jmp SetNextIrq
 
@@ -334,7 +335,7 @@ Irq5:           inc $01                         ;Ensure access to IO memory
                 sta irqSaveA
                 stx irqSaveX
                 sty irqSaveY
-Irq5_Direct:    lda #$17
+                lda #$17
 Irq5_Irq5Line:  ldx #IRQ5_LINE
 Irq5_Wait:      cpx $d012
                 bcs Irq5_Wait
