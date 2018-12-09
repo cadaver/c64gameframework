@@ -36,15 +36,16 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 lda #5                          ;Adjust text margin for the health display
                 sta textLeftMargin
 
-                ldy #C_COMMON
-                jsr LoadResourceFile            ;Preload the common sprites
                 lda #1
                 jsr PlaySong                    ;Play music. Note: some music (even a silence tune)
-                lda #0                          ;needs to be initialized for sound effects to work
+                                                ;needs to be initialized to get sound effect playback
+                                                ;Also, loading music trashes the zone scrolling buffer,
+                                                ;so must load music before changing the zone / beginning gameplay
+
+                lda #0                          ;Setup level / zone we're in
                 jsr ChangeLevel
                 lda #0
                 jsr ChangeZone
-
                 ldx #ACTI_PLAYER                ;Create player actor. Player movement code is in script00.s
                 lda #ACT_PLAYER                 ;to demonstrate runtime code loading / relocation
                 sta actT,x
@@ -56,8 +57,12 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 sta actYH,x
                 jsr InitActor                   ;Init health & actor flags
                 jsr CenterPlayer                ;Center scrolling on player & redraw
-
                 jsr SavePlayerState             ;Make an "in-memory checkpoint" for restarting
+                jsr UpdateFrame                 ;Show screen just to demonstrate loading while screen is on
+                jsr RedrawHUD
+                
+                ldy #C_COMMON
+                jsr LoadResourceFile            ;Preload the common sprites
 
 MainLoop:       jsr ScrollLogic
                 jsr DrawActors

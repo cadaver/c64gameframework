@@ -21,22 +21,29 @@ IA_SwitchGetByte:
                 dex
                 bpl IA_SwitchGetByte
 
-        ; Setup screen blanking for loader
+        ; Setup preparations for loading
 
-                lda fastLoadMode
+                lda loaderMode
                 bmi IA_UseFastLoad
-                bne InitZeroPage
-                ldx #StopIrqEnd-StopIrq
-CopyStopIrqCode:lda StopIrq-1,x
+                bne IA_UseFakeFastLoad
+IA_UseSafeMode: ldx #StopIrqEnd-StopIrq         ;Safe mode: setup screen blanking on load begin
+IA_CopyStopIrqCode:
+                lda StopIrq-1,x
                 sta SetSpriteRange-1,x
                 dex
-                bne CopyStopIrqCode
-                lda #<SetSpriteRange            ;Patch the loader for either fast or slowload prepare
-                sta SL_StopIrqJsr+1             ;as necessary
-                lda #>SetSpriteRange
-                sta SL_StopIrqJsr+2
+                bne IA_CopyStopIrqCode
+                lda #<SetSpriteRange
+                ldx #>SetSpriteRange
+                bne IA_SetupStopIrq
+IA_UseFakeFastLoad:
+                cmp #LOAD_EASYFLASH             ;Cart loaders need no mods
+                bcs InitZeroPage
+                lda #<WaitBottom                ;Fake fastload with disk devices: wait bottom of screen on load begin
+                ldx #>WaitBottom
+IA_SetupStopIrq:sta SL_StopIrqJsr+1
+                stx SL_StopIrqJsr+2
                 bne InitZeroPage
-IA_UseFastLoad: lda #<SetSpriteRange
+IA_UseFastLoad: lda #<SetSpriteRange            ;Fastload: setup safe Y-coordinate range for transfer
                 sta FL_SetSpriteRangeJsr+1
                 lda #>SetSpriteRange
                 sta FL_SetSpriteRangeJsr+2
@@ -316,6 +323,7 @@ ANP_PanelRowLoop:
                 sta panelScreen+23*40,x
                 dex
                 bpl ANP_PanelRowLoop
+
                 rts
 
 patchedPrepareDrawScreenCode:

@@ -6,6 +6,8 @@
 
 LOAD_KERNAL     = $00           ;Load using Kernal and do not allow interrupts
 LOAD_FAKEFAST   = $01           ;Load using Kernal, interrupts allowed
+LOAD_EASYFLASH  = $02           ;Load using EasyFlash cartridge
+LOAD_GMOD2      = $03           ;Load using GMod2 cartridge
 LOAD_FAST       = $ff           ;(or any other negative value) Load using custom serial protocol, Kernal not used at all after startup
 
 MW_LENGTH       = 32            ;Bytes in one M-W command
@@ -38,7 +40,7 @@ NMI:            rti
 
 ntscFlag:       dc.b $00
 fileNumber:     dc.b $00                        ;Initial filenumber for the main part
-fastLoadMode:   dc.b LOAD_KERNAL
+loaderMode:     dc.b LOAD_KERNAL
 
 loaderCodeEnd:
 
@@ -87,7 +89,7 @@ IL_SafeMode:    lda #$06
                 sta $d020
                 bne IL_NoFastLoad
 
-IL_NoSerial:    inc fastLoadMode                ;Serial bus not used: switch to "fake" IRQ-loading mode
+IL_NoSerial:    inc loaderMode                  ;Serial bus not used: switch to "fake" IRQ-loading mode
 IL_NoFastLoad:  lda #<(ilSlowLoadStart-1)
                 sta IL_CopyLoaderCode+1
                 lda #>(ilSlowLoadStart-1)
@@ -141,7 +143,7 @@ IL_WaitDataLow: lda status                      ;If error, it's probably IDE64
                 beq IL_NoSerial
                 bne IL_NoFastLoad
 
-IL_FastLoadOK:  dec fastLoadMode
+IL_FastLoadOK:  dec loaderMode
 IL_Done:        ldx #loaderCodeStart-OpenFile
 IL_CopyLoaderCode:
                 lda ilFastLoadStart-1,x         ;Copy either fastload or slowload IO code

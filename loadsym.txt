@@ -15,10 +15,12 @@ FL_SetSpriteRangeJsr
 FL_MinSprY
 FL_MaxSprY
 ntscFlag
-fastLoadMode
+loaderMode
 fileNumber
 loaderCodeStart
 loaderCodeEnd
 LOAD_KERNAL
 LOAD_FAKEFAST
+LOAD_EASYFLASH
+LOAD_GMOD2
 LOAD_FAST

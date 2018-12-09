@@ -81,8 +81,8 @@ Startup:        jsr $ff84   ; Initialise I/O
                 stx fileOpen                    ;Clear loader ZP vars
                 lda #$18
                 sta $d016
-                lda #LOAD_FAKEFAST              ;Loader needs no mods
-                sta fastLoadMode
+                lda #LOAD_GMOD2                 ;Loader needs no mods
+                sta loaderMode
                 lda #$7f
                 sta $dc0d                       ;Disable & acknowledge IRQ sources (Y=$7f)
                 lda $dc0d

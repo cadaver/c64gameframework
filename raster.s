@@ -200,6 +200,10 @@ Irq2_SprIrqDone:
                 sta Irq2_SprJump+1
                 lda sprIrqJumpTblHi,x
                 sta Irq2_SprJump+2
+                lda fileOpen
+                beq Irq2_SprIrqDoneNoLoad
+                dey                             ;If loading, execute sprite IRQ one line earlier
+Irq2_SprIrqDoneNoLoad:
                 tya
                 sec
                 sbc #IRQLATE_SAFETY_MARGIN      ;Already late?
@@ -317,11 +321,10 @@ Irq4_Delay:     dex
                 lda #PANEL_D018
                 sta $d018
                 lsr newFrameFlag                ;Can update sprite doublebuffer now
-Irq4_Irq5Line:  ldy #IRQ5_LINE                  ;Advance for next IRQ if file is open
                 lda fileOpen
-                beq Irq4_NoAdvance
-                dey
-Irq4_NoAdvance: lda #<Irq5                      ;Back to first IRQ
+                bne Irq5_Direct                 ;If file open, busywait instead of exiting IRQ
+Irq4_Irq5Line:  ldy #IRQ5_LINE
+                lda #<Irq5                      
                 ldx #>Irq5
                 jmp SetNextIrq
 
@@ -330,7 +333,8 @@ Irq4_NoAdvance: lda #<Irq5                      ;Back to first IRQ
 Irq5:           inc $01                         ;Ensure access to IO memory
                 sta irqSaveA
                 stx irqSaveX
-                lda #$17
+                sty irqSaveY
+Irq5_Direct:    lda #$17
 Irq5_Irq5Line:  ldx #IRQ5_LINE
 Irq5_Wait:      cpx $d012
                 bcs Irq5_Wait
@@ -341,13 +345,13 @@ Irq5_Wait:      cpx $d012
                 sta $d022
                 lda #PANEL_BG2
                 sta $d023
-                cld
-                sty irqSaveY
                 lda #$17
                 sta $d016                       ;Fixed X-scrolling
-                pha                             ;Delay to hide $d011 write into the sideborder
+                pha
+                pla                             ;Delay to adjust the "screen on" write into the border
+                pha
                 pla
-                bit $00
+                cld
                 sta $d011                       ;Screen on
 Irq5_SfxNum:    ldy #$00                        ;Play a new sound this frame?
                 beq Irq5_SfxDone
