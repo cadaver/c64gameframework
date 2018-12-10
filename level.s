@@ -260,8 +260,7 @@ CL_SavedActorsDone:
         ; Modifies: A,X,Y,loader temp vars,temp vars
 
 ChangeZone:     sta zoneNum
-                ldy #C_LEVEL
-                jsr GetResourceObject           ;Get zone object address (level chunk should already be loaded)
+                jsr GetZoneObject
                 ldy #ZONEH_CHARSET
                 lda (zpSrcLo),y                 ;Get charset to load
 CZ_LoadedCharset:
