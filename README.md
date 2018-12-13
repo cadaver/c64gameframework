@@ -28,8 +28,17 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 
 ## Building
 
-- The Makefile builds the example game as a .d64 image and EF / GMod2 .crt images. Utilities contained in the "tools" subdirectory must be in the path.
+- The Makefile builds the example game as a .d64 image and EF / GMod2 .crt images.
+- Utilities contained in the "tools" subdirectory must be in the path.
 - For rebuilding the utilities on Windows, the MinGW compiler suite is required.
+
+## Getting started with the code
+
+- boot.s is the disk version boot code. It will first load Exomizer2 code and then the compressed disk loader (loader.s), which will detect the drive loaded from, either enable fastloader or not, and proceed to load the mainpart.
+- efboot.s & gmod2boot.s are the same for EasyFlash & GMod2 cartridges. For the most part, the main code can be agnostic of the device used for loading.
+- main.s is the mainpart, which includes the rest of the framework, and contains the game initialization and main loop. Modify to your own needs!
+- script00.s contains all the loadable code used by the example game's actors (player / items / enemies / bullets / explosions.) Common actor code can just as well be contained statically in the mainpart, this is just to demonstrate dynamic code loading.
+- Note that the Makefile assembles the boot part multiple times, as there are circular dependencies between it and the loader. This ensures the boot code has correct addresses to proceed.
 
 ## Memory map
 
@@ -48,6 +57,25 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 - $f800-$fc00 Game screen
 - $fc00-$fc3f Empty sprite
 - $fc40-$fff9 Misc var area 2
+
+## Screen redraw & world graphics
+
+- The screen redraw for scrolling is based on writing both the screen data and color data at once, during a single frame, without doublebuffering.
+- The world editor can edit arbitrarily sized shapes, but these are reduced to 2x2 blocks in the C64 side world data, similar to Steel Ranger.
+- There can be 128 color-per-block blocks (indices 0-127), and 128 color-per-char (indices 128-255) blocks. Selecting the mode per block is handled automatically by the world editor, but an error is displayed if the shapes don't fit inside these limitations, or exceed the charset budget.
+- Color-per-char blocks must have the char color and the low 4 bits of the char screen code the same (inspired by QUOD INIT EXIT 2 by Retream.) Arranging the charset this way is handled automatically by the world editor.
+- In addition, if there are free color-per-block blocks, the editor will create "optimized" blocks which skip the color write when possible, for example empty sky. These are automatically inserted into the C64 side world data.
+- A level can consist of multiple scrolling zones or areas (the example game contains 2.) All the zone map datas of the current level are stored as Exomizer2 compressed within the dynamic allocation area, and when a zone is entered, the map data is depacked at the end of the dynamic memory area, just before music, for actually displaying.
+- Each zone can contain "objects" (such as doorways to other areas) and "actors" (typically items and enemies.)
+
+## Sprite graphics
+
+- Each actor type has its own draw routine, which calls into the framework code (DrawLogicalSprite) to insert logical sprites for rendering. For example the player character is 2 logical sprites: lower and upper body.
+- Logical sprites are created in the sprite editor, and can consist of multiple C64 hardware (physical) sprites.
+- In addition a logical sprite has hotspot coordinates, 0 - n collision bounds (edited graphically) and optionally a connect-spot coordinate.
+- Connect-spot coordinates are used in the actor draw routine to join logical sprites together, for example the player character's body halves. 
+- A logical sprite without a connect-spot will use a slightly faster draw path, so clear the connect-spot (Shift+J) when not needed, for example items and bullets.
+- The sprite editor will save both in editor's own format (for further editing) and C64 resource format (.res files). In projects, it is recommended to put both under version control.
 
 ## World editor (worlded3) controls
 
@@ -191,9 +219,6 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 - Shift+P Put sprite to copybuffer
 - Shift+T Take sprite from copybuffer
 - Shift+X Toggle sprite's "store flipped" mode. If a sprite is stored flipped, depacking it facing left for display is faster.
-
-Note: sprites will be saved both in editor's own format (for further editing) and C64 resource format (.res files). In projects,
-it is recommended to put both under version control.
 
 ## License
 
