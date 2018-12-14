@@ -4990,7 +4990,10 @@ void packcharset(int index)
                             for (int tx = cx&0xfe; tx < (cx&0xfe)+2; ++tx)
                             {
                                 const unsigned char* chardata = &shape.chardata[(ty*MAXSHAPESIZE+tx)*8];
-                                if (chardata[0] | chardata[1] | chardata[2] | chardata[3] | chardata[4] | chardata[5] | chardata[6] | chardata[7])
+                                unsigned char chcol = shape.charcolors[ty*MAXSHAPESIZE+tx];
+                                bool usecharcolor = checkusecharcolor(chardata, chcol);
+
+                                if (usecharcolor)
                                 {
                                     if (shape.charcolors[ty*MAXSHAPESIZE+tx] != shape.charcolors[(cy&0xfe)*MAXSHAPESIZE+(cx&0xfe)])
                                     {
@@ -4999,12 +5002,10 @@ void packcharset(int index)
                                     }
                                 }
                             }
+                            
+                            if (colorperchar)
+                                break;
                         }
-
-                        unsigned char ctl = shape.charcolors[(cy&0xfe)*MAXSHAPESIZE+(cx&0xfe)]&0xf;
-                        unsigned char ctr = shape.charcolors[(cy&0xfe)*MAXSHAPESIZE+(cx&0xfe)+1]&0xf;
-                        unsigned char cbl = shape.charcolors[((cy&0xfe)+1)*MAXSHAPESIZE+(cx&0xfe)]&0xf;
-                        unsigned char cbr = shape.charcolors[((cy&0xfe)+1)*MAXSHAPESIZE+(cx&0xfe)+1]&0xf;
 
                         CharKey ckey;
                         const unsigned char* chardata = &shape.chardata[(cy*MAXSHAPESIZE+cx)*8];
@@ -5023,11 +5024,14 @@ void packcharset(int index)
                         std::map<CharKey, unsigned char>::const_iterator i = charmapping.find(ckey);
                         if (i == charmapping.end())
                         {
-                            unsigned search = 0;
+                            bool usecharcolor = checkusecharcolor(chardata, chcol);
+
+                            unsigned search = 256;
                             // Allocate first those chars for which color-per-char is mandatory (pass 0)
                             // Then, if possible, allocate also for others, as color-per-char blocks are faster to draw
                             if ((pass == 0 && colorperchar) || pass == 1)
                             {
+                                // Try to allocate with proper char color first
                                 search = ckey.second & 0xf;
                                 while (search < 256)
                                 {
@@ -5037,7 +5041,7 @@ void packcharset(int index)
                                         charmapping[ckey] = search;
                                         memcpy(&charset.chardata[search*8], chardata, 8);
                                         charset.charcolors[search] = chcol;
-                                        charset.usecharcolor[search] = checkusecharcolor(chardata, chcol);
+                                        charset.usecharcolor[search] = usecharcolor;
                                         shapechardata[cy*MAXSHAPESIZE+cx] = search;
                                         ++charset.usedchars;
                                         break;
@@ -5045,8 +5049,35 @@ void packcharset(int index)
                                     else
                                         search += 0x10;
                                 }
+
+                                // If does not use char color, can use other chars
+                                if (pass == 1 && !usecharcolor && search >= 256)
+                                {
+                                    search = chcol & 8;
+                                    while (search < 256)
+                                    {
+                                        if (freechars[search])
+                                        {
+                                            freechars[search] = false;
+                                            charmapping[ckey] = search;
+                                            memcpy(&charset.chardata[search*8], chardata, 8);
+                                            charset.charcolors[search] = chcol;
+                                            charset.usecharcolor[search] = usecharcolor;
+                                            shapechardata[cy*MAXSHAPESIZE+cx] = search;
+                                            ++charset.usedchars;
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            ++search;
+                                            if ((search & 8) != (chcol & 8))
+                                                search += 8;
+                                        }
+                                    }
+                                }
                             }
-                            // If did not allocate yet, color-per-block mode allocation
+
+                            // Finally, if did not allocate yet, color-per-block mode allocation
                             if (pass == 1 && !colorperchar && search >= 256)
                             {
                                 search = 0;
@@ -5058,7 +5089,7 @@ void packcharset(int index)
                                         charmapping[ckey] = search;
                                         memcpy(&charset.chardata[search*8], chardata, 8);
                                         charset.charcolors[search] = chcol;
-                                        charset.usecharcolor[search] = checkusecharcolor(chardata, chcol);
+                                        charset.usecharcolor[search] = usecharcolor;
                                         shapechardata[cy*MAXSHAPESIZE+cx] = search;
                                         ++charset.usedchars;
                                         break;
@@ -5068,7 +5099,7 @@ void packcharset(int index)
                                 }
                             }
 
-                            if (search >= 256)
+                            if (pass == 1 && search >= 256)
                                 charset.errored = true;
                         }
                         else
@@ -5100,6 +5131,9 @@ void packcharset(int index)
                             for (int y = 0; y < 8; ++y) sumchardata += charset.chardata[br*8+y];
 
                             bool requirecpc = ctr != ctl || cbl != ctl || cbr != ctl;
+                            if (!charset.usecharcolor[tl] && !charset.usecharcolor[tr] && !charset.usecharcolor[bl] && !charset.usecharcolor[tr])
+                                requirecpc = false;
+
                             bool canusecpc = ((tl&0xf) == ctl || (!charset.usecharcolor[tl] && (tl&0x8)))
                                 && ((tr&0xf) == ctr || (!charset.usecharcolor[tr] && (tr&0x8)))
                                 && ((bl&0xf) == cbl || (!charset.usecharcolor[bl] && (bl&0x8)))
