@@ -1372,3 +1372,27 @@ GCP_XPos:       sta xHi
                 sta xLo
                 rts
 
+        ; Modify damage by a multiplier
+        ;
+        ; Parameters: A damage Y multiplier (8 = unmodified)
+        ; Returns: A modified damage
+        ; Modifies: A,Y,zpDestLo-Hi,loadTempReg
+
+ModifyDamage:   cpy #NO_MODIFY                  ;Optimize the unmodified case
+                beq MD_Done
+                stx loadTempReg
+                ldx #zpDestLo
+                jsr MulU
+                lda zpDestLo
+                lsr zpDestHi                    ;Divide by 8
+                ror
+                lsr zpDestHi
+                ror
+                lsr zpDestHi
+                bne MD_Overflow                 ;If MSB is not 0 at this point, clamp to maximum
+                ror
+                adc #$00                        ;Round to nearest
+MD_NotZero:     skip2
+MD_Overflow:    lda #$ff
+                ldx loadTempReg
+MD_Done:        rts
