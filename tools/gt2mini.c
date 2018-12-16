@@ -93,6 +93,7 @@ unsigned char instrpulseused[256];
 unsigned char instrfirstwavepos[256];
 unsigned char instrlastwavepos[256];
 unsigned char legatoinstrmap[256];
+unsigned char legatostepmap[256];
 unsigned char waveposmap[256];
 unsigned char pulseposmap[256];
 unsigned char filtposmap[256];
@@ -576,6 +577,7 @@ void convertsong(void)
     memset(instrfirstwavepos, 0, sizeof instrfirstwavepos);
     memset(instrlastwavepos, 0, sizeof instrlastwavepos);
     memset(legatoinstrmap, 0, sizeof legatoinstrmap);
+    memset(legatostepmap, 0, sizeof legatostepmap);
     memset(slidemap, 0, sizeof slidemap);
     memset(vibratomap, 0, sizeof vibratomap);
     memset(waveposmap, 0, sizeof waveposmap);
@@ -1161,17 +1163,6 @@ void convertsong(void)
             lastwaveptr = waveptr;
         }
 
-        /*
-        printf("Initial pattern %d:\n", e);
-        for (c = 0; c < MAX_PATTROWS*2; ++c)
-        {
-            printf("%02x: %02x %02x %02x\n", c, notecolumn[c],cmdcolumn[c],durcolumn[c]);
-            if (notecolumn[c] == MP_ENDPATT)
-                break;
-        }
-        printf("\n");
-        */
-
         for (c = 0; c < MAX_PATTROWS*2;)
         {
             int merge = 0;
@@ -1284,17 +1275,6 @@ void convertsong(void)
                 lastdur = durcolumn[c];
         }
 
-        /*
-        printf("Final pattern %d:\n", e);
-        for (c = 0; c < MAX_PATTROWS*2; ++c)
-        {
-            printf("%02x: %02x %02x %02x\n", c, notecolumn[c],cmdcolumn[c],durcolumn[c]);
-            if (notecolumn[c] == MP_ENDPATT)
-                break;
-        }
-        printf("\n");
-        */
-        
         // Build the final patterndata
         for (c = 0; c < MAX_PATTROWS*2; c++)
         {
@@ -1399,13 +1379,6 @@ void convertsong(void)
 
                 for (f = 0; f <= highestusedsong; ++f)
                 {
-                    /*
-                    printf("Song %d before merge:\n", f);
-                    for (g = 0; g < mpsongtotallen[f]; ++g)
-                        printf("%02x ", mptracks[f][g]);
-                    printf("\n\n");
-                    */
-
                     for (g = 0; g < mpsongtotallen[f];)
                     {
                         if (mptracks[f][g] == mergesrc+1)
@@ -1436,13 +1409,6 @@ void convertsong(void)
                             ++g;
                         }
                     }
-                    
-                    /*
-                    printf("Song %d after merge:\n", f);
-                    for (g = 0; g < mpsongtotallen[f]; ++g)
-                        printf("%02x ", mptracks[f][g]);
-                    printf("\n\n");
-                    */
                 }
                 break;
             }
@@ -1455,11 +1421,25 @@ unsigned char getlegatoinstr(unsigned char instr)
 {
     if (legatoinstrmap[instr])
         return legatoinstrmap[instr];
-    
+
+    if (!legatostepmap[instrlastwavepos[instr]])
+    {
+        if (mpwavesize >= 255)
+        {
+            printf("Out of wavetable space while converting legato instrument\n");
+            exit(1);
+        }
+        mpwavetbl[mpwavesize] = 0xff;
+        mpnotetbl[mpwavesize] = mpnotetbl[instrlastwavepos[instr]-1];
+        mpwavenexttbl[mpwavesize] = mpwavenexttbl[instrlastwavepos[instr]-1];
+        legatostepmap[instrlastwavepos[instr]] = mpwavesize + 1;
+        ++mpwavesize;
+    }
+
     mpinsad[mpinssize] = 0;
     mpinssr[mpinssize] = 0;
     mpinsfirstwave[mpinssize] = 0;
-    mpinswavepos[mpinssize] = instrlastwavepos[instr];
+    mpinswavepos[mpinssize] = legatostepmap[instrlastwavepos[instr]];
     mpinspulsepos[mpinssize] = 0;
     mpinsfiltpos[mpinssize] = 0;
     legatoinstrmap[instr] = mpinssize+0x81;
