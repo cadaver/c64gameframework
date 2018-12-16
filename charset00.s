@@ -15,9 +15,9 @@
                 org blkColors
                 incbin bg/world00.blc
 
-                org charAnimCode
-                rts
-
                 org lvlObjAnimFrames
                 incbin bg/world00.oba
+                
+                org charAnimCodeJump
+                rts
 

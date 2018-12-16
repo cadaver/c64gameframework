@@ -64,7 +64,7 @@ RS_ToggleOptimizeLoop:
                 sta blkColors,x
 RS_ToggleOptimizeSkip:
                 inx
-                bpl RS_ToggleOptimizeLoop
+                bne RS_ToggleOptimizeLoop
                 rts
 
         ; Set sprite Y-range for fastload. Called before the load operation.

@@ -57,12 +57,12 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawbottomleft
                 subroutine dbl
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bne .1
                 lda blkBL,y
                 sta colors+{1}
                 bcc .3
-.1:             lda blkColors,y
-                sta colors+{1}
+.1:             sta colors+{1}
 .2:             lda blkBL,y
 .3:             sta screen+{1}
                 subroutine dblend
@@ -71,16 +71,16 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawbottom
                 subroutine db
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bmi .1
+                bne .2
                 lda blkBL,y
                 sta colors+{1},x
                 sta screen+{1},x
                 lda blkBR,y
                 sta colors+{1}+1,x
                 bcc .3
-.1:             lda blkColors,y
-                bmi .2
-                sta colors+{1},x
+.1:             sta colors+{1},x
                 sta colors+{1}+1,x
 .2:             lda blkBL,y
                 sta screen+{1},x
@@ -92,12 +92,12 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawbottomright
                 subroutine dbr
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bne .1
                 lda blkBR,y
                 sta colors+{1}
                 bcc .3
-.1:             lda blkColors,y
-                sta colors+{1}
+.1:             sta colors+{1}
 .2:             lda blkBR,y
 .3:             sta screen+{1}
                 subroutine dbrend
@@ -106,12 +106,12 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawtopleft
                 subroutine dtl
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bne .1
                 lda blkTL,y
                 sta colors+{1}
                 bcc .3
-.1:             lda blkColors,y
-                sta colors+{1}
+.1:             sta colors+{1}
 .2:             lda blkTL,y
 .3:             sta screen+{1}
                 subroutine dtlend
@@ -120,16 +120,16 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawtop
                 subroutine dt
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bmi .1
+                bne .2
                 lda blkTL,y
                 sta colors+{1},x
                 sta screen+{1},x
                 lda blkTR,y
                 sta colors+{1}+1,x
                 bcc .3
-.1:             lda blkColors,y
-                bmi .2
-                sta colors+{1},x
+.1:             sta colors+{1},x
                 sta colors+{1}+1,x
 .2:             lda blkTL,y
                 sta screen+{1},x
@@ -141,12 +141,12 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawtopright
                 subroutine dtr
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bne .1
                 lda blkTR,y
                 sta colors+{1}
                 bcc .3
-.1:             lda blkColors,y
-                sta colors+{1}
+.1:             sta colors+{1}
 .2:             lda blkTR,y
 .3:             sta screen+{1}
                 subroutine dtrend
@@ -155,16 +155,16 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawleft
                 subroutine dl
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bmi .1
+                bne .2
                 lda blkTL,y
                 sta colors+{1},x
                 sta screen+{1},x
                 lda blkBL,y
                 sta colors+{1}+40,x
                 bcc .3
-.1:             lda blkColors,y
-                bmi .2
-                sta colors+{1},x
+.1:             sta colors+{1},x
                 sta colors+{1}+40,x
 .2:             lda blkTL,y
                 sta screen+{1},x
@@ -176,16 +176,16 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawright
                 subroutine dr
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bmi .1
+                bne .2
                 lda blkTR,y
                 sta colors+{1}+1,x
                 sta screen+{1}+1,x
                 lda blkBR,y
                 sta colors+{1}+41,x
                 bcc .3
-.1:             lda blkColors,y
-                bmi .2
-                sta colors+{1}+1,x
+.1:             sta colors+{1}+1,x
                 sta colors+{1}+41,x
 .2:             lda blkTR,y
                 sta screen+{1}+1,x
@@ -197,7 +197,9 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawfullblock
                 subroutine dfb
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bmi .1
+                bne .2
                 lda blkTL,y
                 sta colors+{1},x
                 sta screen+{1},x
@@ -210,9 +212,7 @@ NEXT_EP         set NEXT_EP + 1
                 lda blkBR,y
                 sta colors+{1}+41,x
                 bcc .3
-.1:             lda blkColors,y
-                bmi .2
-                sta colors+{1},x
+.1:             sta colors+{1},x
                 sta colors+{1}+1,x
                 sta colors+{1}+40,x
                 sta colors+{1}+41,x
@@ -230,7 +230,9 @@ NEXT_EP         set NEXT_EP + 1
                 mac drawfullblockexit
                 subroutine dfbe
                 ldy $1000,x
-                bpl .1
+                lda blkColors,y
+                bmi .1
+                bne .2
                 lda blkTL,y
                 sta colors+{1},x
                 sta screen+{1},x
@@ -244,9 +246,7 @@ NEXT_EP         set NEXT_EP + 1
                 sta colors+{1}+41,x
                 sta screen+{1}+41,x
                 bcc {2}
-.1:             lda blkColors,y
-                bmi .2
-                sta colors+{1},x
+.1:             sta colors+{1},x
                 sta colors+{1}+1,x
                 sta colors+{1}+40,x
                 sta colors+{1}+41,x

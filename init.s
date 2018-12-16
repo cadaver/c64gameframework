@@ -176,7 +176,7 @@ IPC_PanelSpriteLoop:
                 dex
                 bpl IPC_PanelSpriteLoop
                 lda #$60                        ;Prevent crash if charset animation attempted without charset
-                sta charAnimCode
+                sta charAnimCodeJump
 
         ; Initialize resources
         

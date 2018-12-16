@@ -202,9 +202,9 @@ blkBR           = $e700
 chars           = $e800
 blkInfo         = $f000
 blkColors       = $f100
-charAnimCode    = $f180
 lvlObjAnimFrames = $f200
-miscVarArea1    = $f240
+charAnimCodeJump = $f2bd
+miscVarArea1    = $f2c0
 screen          = $f800
 emptySprite     = $fc00
 miscVarArea2    = $fc40
@@ -243,11 +243,6 @@ miscVarArea2    = $fc40
                 varrange lvlActWpn,MAX_LVLACT
                 varrange lvlActOrg,MAX_LVLACT
 
-        ; Maprowtable
-
-                varrange mapTblLo,MAX_MAPROWS
-                varrange mapTblHi,MAX_MAPROWS
-
                 checkvarbase screen
 
                 varbase screen+SCROLLROWS*40
@@ -283,5 +278,10 @@ miscVarArea2    = $fc40
                 varrange navAreaR,MAX_NAVAREAS
                 varrange navAreaU,MAX_NAVAREAS
                 varrange navAreaD,MAX_NAVAREAS
+            
+        ; Maprowtable
 
+                varrange mapTblLo,MAX_MAPROWS
+                varrange mapTblHi,MAX_MAPROWS
+                
                 checkvarbase $fffa

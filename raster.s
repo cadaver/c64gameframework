@@ -388,7 +388,7 @@ Irq5_CharAnimFlag:
                 dec $d020
                 endif
                 dec $01                         ;Restore original $01 value to be sure RAM access is available
-                jsr charAnimCode                ;(char anim code should only touch the charset)
+                jsr charAnimCodeJump            ;(char anim code should only touch the charset)
                 inc $01
                 if SHOW_CHARSETANIM_TIME > 0
                 inc $d020

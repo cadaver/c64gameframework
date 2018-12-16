@@ -55,6 +55,8 @@ extern "C" {
 #define BLOCKPIXELSIZE_ZOOMOUT 4
 #define SCREENSIZEX 19
 #define SCREENSIZEY 11
+#define ZONESIZEX 1
+#define ZONESIZEY 1
 #define MAXSHAPESIZE 16
 #define MAXSHAPEBLOCKSIZE 8
 #define ZOOMSHAPEVIEW 6
@@ -83,7 +85,7 @@ struct Charset
     Shape shapes[NUMSHAPES];
     unsigned char chardata[2048];
     unsigned char charcolors[256];
-    unsigned char blockcolors[NUMBLOCKS/2];
+    unsigned char blockcolors[NUMBLOCKS];
     unsigned char blockdata[NUMBLOCKS*BLOCKDATASIZE];
     unsigned char blockinfos[NUMBLOCKS];
     unsigned char shapeblocks[NUMSHAPES][MAXSHAPEBLOCKSIZE*MAXSHAPEBLOCKSIZE];
@@ -171,10 +173,7 @@ struct Zone
 struct LevelInfo
 {
     bool used;
-    std::vector<int> zones;  
-    std::vector<unsigned char> zonex;
-    std::vector<unsigned char> zoney;
-    std::vector<unsigned char> zonesize;
+    std::vector<int> zones;
     int actors;
     int actorbitstart;
     int objects;
@@ -190,12 +189,12 @@ typedef std::pair<int, int> CoordKey;
 unsigned char slopetbl[] = {
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  // Slope 0
   0x78,0x70,0x68,0x60,0x58,0x50,0x48,0x40,0x38,0x30,0x28,0x20,0x18,0x10,0x08,0x00,  // Slope 1
-  0x78,0x78,0x70,0x70,0x68,0x68,0x60,0x60,0x58,0x58,0x50,0x50,0x48,0x48,0x40,0x40,  // Slope 2
-  0x38,0x38,0x30,0x30,0x28,0x28,0x20,0x20,0x18,0x18,0x10,0x10,0x08,0x08,0x00,0x00,  // Slope 3
+  0x38,0x38,0x30,0x30,0x28,0x28,0x20,0x20,0x18,0x18,0x10,0x10,0x08,0x08,0x00,0x00,  // Slope 2
+  0x78,0x78,0x70,0x70,0x68,0x68,0x60,0x60,0x58,0x58,0x50,0x50,0x48,0x48,0x40,0x40,  // Slope 3
   0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,  // Slope 4
   0x00,0x08,0x10,0x18,0x20,0x28,0x30,0x38,0x40,0x48,0x50,0x58,0x60,0x68,0x70,0x78,  // Slope 5
   0x00,0x00,0x08,0x08,0x10,0x10,0x18,0x18,0x20,0x20,0x28,0x28,0x30,0x30,0x38,0x38,  // Slope 6
-  0x40,0x40,0x48,0x48,0x50,0x50,0x58,0x58,0x60,0x60,0x68,0x68,0x70,0x70,0x78,0x78   // Slope 7
+  0x40,0x40,0x48,0x48,0x50,0x50,0x58,0x58,0x60,0x60,0x68,0x68,0x70,0x70,0x78,0x78,  // Slope 7
 };
 
 char* objmodetxts[] = {
@@ -238,6 +237,7 @@ int screensizex = 512;
 int screensizey = 384;
 unsigned char charsetnum = 0;
 unsigned char shapenum = 0;
+int srcshapenum = -1;
 unsigned zonenum = 0;
 unsigned char acttype = 1;
 int osx = 0; // Shape offset in zoomed view
@@ -345,6 +345,7 @@ void resetcharset(Charset& charset);
 void resetshape(Shape& shape);
 void deleteshape(int dsnum);
 void insertshape();
+void moveshape();
 void insertcharset();
 void updateshapeuse();
 void updatelockedmode();
@@ -726,7 +727,7 @@ void drawandeditpalette()
     }
 
     // Swap colors globally
-    if (key == KEY_P && shiftdown)
+    if (key == KEY_P && shiftdown && ctrldown)
     {
         for (int c = 0; c < 4; ++c)
         {
@@ -1221,7 +1222,7 @@ void drawandeditshape()
         int ecy = mousey/40 + osy;
         int x = (mousex%40)/5;
         int y = (mousey%40)/5;
-        
+
         // Allow editing/pasting also over the unzoomed shape
         if (mousex >= shapex)
         {
@@ -1613,13 +1614,23 @@ void drawandeditshape()
         grabmode = 3;
         shapecopybuffer = shape;
         scbblockinfos = true;
+        srcshapenum = shapenum;
     }
     if (key == KEY_T && shiftdown && !(shapecopybuffer.sx & 1) && !(shapecopybuffer.sy & 1) && shapecopybuffer.sx >= 2 && shapecopybuffer.sx >= 2)
     {
         if (grabmode != 3)
             grabmode = 0;
-        shape = shapecopybuffer;
-        charset.dirty = true;
+        // Shape move
+        if (ctrldown && srcshapenum != -1)
+        {
+            moveshape();
+            srcshapenum = -1;
+        }
+        else
+        {
+            shape = shapecopybuffer;
+            charset.dirty = true;
+        }
     }
     // Whole shape clear
     if (key == KEY_C && shiftdown)
@@ -2067,8 +2078,8 @@ void drawmap()
 
                     int c = COL_WHITE;
                     unsigned char blocknum = cbuf.blocknum[y*zone.sx+x];
-                    const char* modestr = blocknum < 128 ? "B" : "C";
-                    if ((blocknum < 128 && charset.blockcolors[blocknum] >= 0x40) || (charset.optblocknum[blocknum] >= 0 && checkuseoptimize(cbuf, x, y, zone, false)))
+                    const char* modestr = charset.blockcolors[blocknum] ? "B" : "C";
+                    if (charset.blockcolors[blocknum] & 0x40 || (charset.optblocknum[blocknum] >= 0 && checkuseoptimize(cbuf, x, y, zone, false)))
                     {
                         modestr = "O";
                         c = COL_HIGHLIGHT;
@@ -2739,8 +2750,6 @@ void editzone()
         {
             int x = mapx+mousex/divisor;
             int y = mapy+mousey/divisor;
-            x = x/SCREENSIZEX*SCREENSIZEX;
-            y = y/SCREENSIZEY*SCREENSIZEY;
 
             if (!ctrldown)
             {
@@ -2803,8 +2812,8 @@ void editzone()
         {
             if (!zone.sx && !zone.sy)
             {
-                int nx = x/SCREENSIZEX*SCREENSIZEX;
-                int ny = y/SCREENSIZEY*SCREENSIZEY;
+                int nx = x;
+                int ny = y;
                 int nsx = SCREENSIZEX;
                 int nsy = SCREENSIZEY;
                 if (checkzonelegal(zonenum, nx, ny, nsx, nsy))
@@ -2833,8 +2842,8 @@ void editzone()
             {
                 if (!shiftdown)
                 {
-                    int px = x/SCREENSIZEX*SCREENSIZEX;
-                    int py = y/SCREENSIZEY*SCREENSIZEY;
+                    int px = x;
+                    int py = y;
                     int nx = zone.x;
                     int ny = zone.y;
                     int nsx = zone.sx;
@@ -2844,15 +2853,15 @@ void editzone()
                         nx = px;
                         nsx = zone.x+zone.sx-nx;
                     }
-                    else if (px+SCREENSIZEX-zone.x > zone.sx)
-                        nsx = px+SCREENSIZEX-zone.x;
+                    else if (px+ZONESIZEX-zone.x > zone.sx)
+                        nsx = px+ZONESIZEX-zone.x;
                     if (py < ny)
                     {
                         ny = py;
                         nsy = zone.y+zone.sy-ny;
                     }
-                    else if (py+SCREENSIZEY-zone.y > zone.sy)
-                        nsy = py+SCREENSIZEY-zone.y;
+                    else if (py+ZONESIZEY-zone.y > zone.sy)
+                        nsy = py+ZONESIZEY-zone.y;
                     if (checkzonelegal(zonenum, nx, ny, nsx, nsy))
                     {
                         int oldx = zone.x;
@@ -2868,20 +2877,20 @@ void editzone()
                 {
                     if (x == zone.x && zone.sx > SCREENSIZEX)
                     {
-                        zone.x += SCREENSIZEX;
-                        zone.sx -= SCREENSIZEX;
-                        movezonetiles(zone, -SCREENSIZEX, 0);
+                        zone.x += ZONESIZEX;
+                        zone.sx -= ZONESIZEX;
+                        movezonetiles(zone, -ZONESIZEX, 0);
                     }
                     else if (x == zone.x + zone.sx - 1 && zone.sx > SCREENSIZEX)
-                        zone.sx -= SCREENSIZEX;
+                        zone.sx -= ZONESIZEX;
                     else if (y == zone.y && zone.sy > SCREENSIZEY)
                     {
-                        zone.y += SCREENSIZEY;
-                        zone.sy -= SCREENSIZEY;
-                        movezonetiles(zone, 0, -SCREENSIZEY);
+                        zone.y += ZONESIZEY;
+                        zone.sy -= ZONESIZEY;
+                        movezonetiles(zone, 0, -ZONESIZEY);
                     }
                     else if (y == zone.y + zone.sy - 1 && zone.sy > SCREENSIZEY)
-                        zone.sy -= SCREENSIZEY;
+                        zone.sy -= ZONESIZEY;
                 }
             }
         }
@@ -2892,8 +2901,7 @@ void editzone()
     {
         sprintf(textbuffer, "WPOS %d,%d", zone.x/SCREENSIZEX, zone.y/SCREENSIZEY);
         printtext_color(textbuffer, 0, texty+30, SPR_FONTS, COL_WHITE);
-        int zssy = (zone.y+zone.sy-1-(zone.y/SCREENSIZEY*SCREENSIZEY))/SCREENSIZEY+1;
-        sprintf(textbuffer, "SIZE %d,%d", zone.sx/SCREENSIZEX, zssy);
+        sprintf(textbuffer, "SIZE %d,%d", zone.sx, zone.sy);
         printtext_color(textbuffer, 0, texty+45, SPR_FONTS, COL_WHITE);
     }
     else
@@ -3216,8 +3224,7 @@ void editactors()
     {
         sprintf(textbuffer, "WPOS %d,%d", zone.x/SCREENSIZEX, zone.y/SCREENSIZEY);
         printtext_color(textbuffer, 0, texty+30, SPR_FONTS, COL_WHITE);
-        int zssy = (zone.y+zone.sy-1-(zone.y/SCREENSIZEY*SCREENSIZEY))/SCREENSIZEY+1;
-        sprintf(textbuffer, "SIZE %d,%d", zone.sx/SCREENSIZEX, zssy);
+        sprintf(textbuffer, "SIZE %d,%d", zone.sx, zone.sy);
         printtext_color(textbuffer, 0, texty+45, SPR_FONTS, COL_WHITE);
     }
     else
@@ -3719,6 +3726,35 @@ void insertshape()
     resetshape(charsets[charsetnum].shapes[shapenum]);
     charsets[charsetnum].dirty = true;
     shapeusedirty = true;
+}
+
+void moveshape()
+{
+    if (srcshapenum == shapenum)
+        return;
+
+    insertshape();
+    if (srcshapenum > shapenum)
+        srcshapenum++;
+    charsets[charsetnum].shapes[shapenum] = charsets[charsetnum].shapes[srcshapenum];
+
+    for (int z = 0; z < NUMZONES; ++z)
+    {
+        Zone& zone = zones[z];
+        if (zone.sx && zone.sy && zone.charset == charsetnum)
+        {
+            if (zone.fill == srcshapenum)
+                zone.fill = shapenum;
+
+            for (int t = 0; t < zone.tiles.size(); ++t)
+            {
+                 if (zone.tiles[t].s == srcshapenum)
+                    zone.tiles[t].s = shapenum;
+            }
+        }
+    }
+
+    deleteshape(srcshapenum);
 }
 
 void updateshapeuse()
@@ -4237,7 +4273,7 @@ void savealldata()
                 handle = open(ib2, O_RDWR|O_BINARY|O_TRUNC|O_CREAT, S_IREAD|S_IWRITE);
                 if (handle != -1)
                 {
-                    write(handle, charset.chardata, 255*8);
+                    write(handle, charset.chardata, 256*8);
                     close(handle);
                 }
                 sprintf(ib2, "%s%02d.bli", ib1, s);
@@ -4251,7 +4287,7 @@ void savealldata()
                 handle = open(ib2, O_RDWR|O_BINARY|O_TRUNC|O_CREAT, S_IREAD|S_IWRITE);
                 if (handle != -1)
                 {
-                    write(handle, charset.blockcolors, NUMBLOCKS/2);
+                    write(handle, charset.blockcolors, NUMBLOCKS);
                     close(handle);
                 }
                 sprintf(ib2, "%s%02d.blk", ib1, s);
@@ -4321,9 +4357,6 @@ void savealldata()
             {
                 infos[l].used = false;
                 infos[l].zones.clear();
-                infos[l].zonex.clear();
-                infos[l].zoney.clear();
-                infos[l].zonesize.clear();
                 infos[l].actors = 0;
                 infos[l].actorbitstart = 0;
                 infos[l].objects = 0;
@@ -4374,11 +4407,6 @@ void savealldata()
                     zone.id = level.zones.size();
 
                     level.zones.push_back(z);
-                    level.zonex.push_back(zone.x / SCREENSIZEX);
-                    level.zoney.push_back(zone.y / SCREENSIZEY);
-                    int zssx = zone.sx / SCREENSIZEX;
-                    int zssy = (zone.y+zone.sy-1-(zone.y/SCREENSIZEY*SCREENSIZEY))/SCREENSIZEY+1;
-                    level.zonesize.push_back(zssx | (zssy<<4));
                 }
             }
 
@@ -4970,7 +4998,7 @@ void packcharset(int index)
     for (int c = 0; c < 256; ++c)
         charset.usecharcolor[c] = false;
 
-    for (int pass = 0; pass < 2; ++pass)
+    for (int pass = 0; pass < 3; ++pass)
     {
         for (int s = 0; s < NUMSHAPES; ++s)
         {
@@ -4991,15 +5019,11 @@ void packcharset(int index)
                             {
                                 const unsigned char* chardata = &shape.chardata[(ty*MAXSHAPESIZE+tx)*8];
                                 unsigned char chcol = shape.charcolors[ty*MAXSHAPESIZE+tx];
-                                bool usecharcolor = checkusecharcolor(chardata, chcol);
 
-                                if (usecharcolor)
+                                if (shape.charcolors[ty*MAXSHAPESIZE+tx] != shape.charcolors[(cy&0xfe)*MAXSHAPESIZE+(cx&0xfe)])
                                 {
-                                    if (shape.charcolors[ty*MAXSHAPESIZE+tx] != shape.charcolors[(cy&0xfe)*MAXSHAPESIZE+(cx&0xfe)])
-                                    {
-                                        colorperchar = true;
-                                        break;
-                                    }
+                                    colorperchar = true;
+                                    break;
                                 }
                             }
                             
@@ -5019,20 +5043,23 @@ void packcharset(int index)
                                 | (((unsigned long long)chardata[7]) << 56);
 
                         unsigned char chcol = shape.charcolors[cy*MAXSHAPESIZE+cx] & 0xf;
+                        bool usecharcolor = checkusecharcolor(chardata, chcol);
                         ckey.second = chcol;
+                        // If char doesn't use char color, avoid allocating multiple copies of it even if referred to in different blocks
+                        // with different colors
+                        if (!usecharcolor && chcol >= 0x8)
+                            ckey.second = 0x8;
 
                         std::map<CharKey, unsigned char>::const_iterator i = charmapping.find(ckey);
                         if (i == charmapping.end())
                         {
-                            bool usecharcolor = checkusecharcolor(chardata, chcol);
-
                             unsigned search = 256;
-                            // Allocate first those chars for which color-per-char is mandatory (pass 0)
-                            // Then, if possible, allocate also for others, as color-per-char blocks are faster to draw
-                            if ((pass == 0 && colorperchar) || pass == 1)
+
+                            // Allocate first those chars for which color-per-char is mandatory
+                            if ((pass == 0 && colorperchar && usecharcolor) || (pass == 1 && colorperchar))
                             {
                                 // Try to allocate with proper char color first
-                                search = ckey.second & 0xf;
+                                search = chcol & 0xf;
                                 while (search < 256)
                                 {
                                     if (freechars[search])
@@ -5049,11 +5076,10 @@ void packcharset(int index)
                                     else
                                         search += 0x10;
                                 }
-
-                                // If does not use char color, can use other chars
-                                if (pass == 1 && !usecharcolor && search >= 256)
+                                // If doesn't use char color, can allocate anywhere as long as multicolor / singlecolor matches
+                                if (!usecharcolor && search >= 256)
                                 {
-                                    search = chcol & 8;
+                                    search = chcol & 0x8;
                                     while (search < 256)
                                     {
                                         if (freechars[search])
@@ -5070,15 +5096,15 @@ void packcharset(int index)
                                         else
                                         {
                                             ++search;
-                                            if ((search & 8) != (chcol & 8))
-                                                search += 8;
+                                            if ((search & 0x8) != (chcol & 0x8))
+                                                search += 0x8;
                                         }
                                     }
                                 }
                             }
 
-                            // Finally, if did not allocate yet, color-per-block mode allocation
-                            if (pass == 1 && !colorperchar && search >= 256)
+                            // Final pass for color-per-block mode allocation
+                            if (pass == 2 && !colorperchar)
                             {
                                 search = 0;
                                 while (search < 256)
@@ -5099,7 +5125,7 @@ void packcharset(int index)
                                 }
                             }
 
-                            if (pass == 1 && search >= 256)
+                            if (pass == 2 && search >= 256)
                                 charset.errored = true;
                         }
                         else
@@ -5107,7 +5133,8 @@ void packcharset(int index)
                     }
                 }
 
-                if (pass == 1)
+                // Build blocks on the final pass
+                if (pass == 2)
                 {
                     for (int cy = 0; cy < shape.sy; cy += 2)
                     {
@@ -5130,20 +5157,8 @@ void packcharset(int index)
                             for (int y = 0; y < 8; ++y) sumchardata += charset.chardata[bl*8+y];
                             for (int y = 0; y < 8; ++y) sumchardata += charset.chardata[br*8+y];
 
+                            unsigned char blkcol = ctl;
                             bool requirecpc = ctr != ctl || cbl != ctl || cbr != ctl;
-                            if (!charset.usecharcolor[tl] && !charset.usecharcolor[tr] && !charset.usecharcolor[bl] && !charset.usecharcolor[tr])
-                                requirecpc = false;
-
-                            bool canusecpc = ((tl&0xf) == ctl || (!charset.usecharcolor[tl] && (tl&0x8)))
-                                && ((tr&0xf) == ctr || (!charset.usecharcolor[tr] && (tr&0x8)))
-                                && ((bl&0xf) == cbl || (!charset.usecharcolor[bl] && (bl&0x8)))
-                                && ((br&0xf) == cbr || (!charset.usecharcolor[br] && (br&0x8)));
-
-                            if (sumchardata == 0)
-                            {
-                                requirecpc = 0;
-                                canusecpc = 0;
-                            }
 
                             bkey.first = tl
                                 | (((unsigned)tr) << 8)
@@ -5155,30 +5170,25 @@ void packcharset(int index)
                             {
                                 int blocknum = -1;
 
-                                if (requirecpc || canusecpc)
+                                for (int search = 0; search < 256; ++search)
                                 {
-                                    for (int search = 128; search < 256; ++search)
+                                    if (freeblocks[search])
                                     {
-                                        if (freeblocks[search])
+                                        blocknum = search;
+                                        if (requirecpc)
                                         {
-                                            blocknum = search;
-                                            break;
+                                            ++charset.cpcblocks;
+                                            charset.blockcolors[search] = 0; // Color per char = blockcolor 0
                                         }
-                                    }
-                                }
-
-                                if (blocknum < 0 && !requirecpc)
-                                {
-                                    for (int search = 0; search < 128; ++search)
-                                    {
-                                        if (freeblocks[search])
+                                        else
                                         {
-                                            charset.blockcolors[search] = shape.charcolors[cy*MAXSHAPESIZE+cx];
+                                            ++charset.cpbblocks;
+                                            charset.blockcolors[search] = (blkcol & 0xf) | 0x80; // Color per block = blockcolor with high bit set
+                                            // If block is empty, mark it optimizing right away, but neighbour blocks with actual color cannot optimize themselves
                                             if (!sumchardata)
-                                                charset.blockcolors[search] = 0xff; // Illegal color that is not to be relied on
-                                            blocknum = search;
-                                            break;
+                                                charset.blockcolors[search] = 0xc0;
                                         }
+                                        break;
                                     }
                                 }
 
@@ -5191,10 +5201,6 @@ void packcharset(int index)
                                     charset.blockinfos[blocknum] = shape.blockinfos[cy/2*MAXSHAPEBLOCKSIZE+cx/2];
                                     charset.shapeblocks[s][cy/2*MAXSHAPEBLOCKSIZE+cx/2] = blocknum;
                                     ++charset.usedblocks;
-                                    if (blocknum > 128)
-                                        ++charset.cpcblocks;
-                                    else
-                                        ++charset.cpbblocks;
                                     freeblocks[blocknum] = false;
                                     blockmapping[bkey] = blocknum;
                                 }
@@ -5237,16 +5243,19 @@ void packcharset(int index)
     // Construct the optimized blocks
     for (int c = 0; c < NUMBLOCKS; ++c)
     {
-        // Easy case: if color-per-block and only optimized use, just change the blockcolor
-        if (c < 128 && charset.usecount[c] == 0 && charset.usecount[c] > 0)
+        // Easy case: if only optimized use, just change the blockcolor
+        if (charset.usecount[c] == 0 && charset.optusecount[c] > 0)
         {
-            charset.blockcolors[c] |= 0xc0;
+            if (charset.blockcolors[c] > 0)
+                charset.blockcolors[c] = (charset.blockcolors[c] & 0xf) | 0x40;
+            else
+                charset.blockcolors[c] = (charset.blockdata[c] & 0xf) | 0x40;
             ++charset.optblocks;
             --charset.cpbblocks;
         }
         else if (charset.optusecount[c] > 0)
         {
-            for (int search = 0; search < 128; ++search)
+            for (int search = 0; search < 256; ++search)
             {
                 if (freeblocks[search])
                 {
@@ -5256,10 +5265,10 @@ void packcharset(int index)
                     charset.blockdata[search+512] = charset.blockdata[c+512];
                     charset.blockdata[search+768] = charset.blockdata[c+768];
                     charset.blockinfos[search] = charset.blockinfos[c];
-                    if (c < 128)
-                        charset.blockcolors[search] = charset.blockcolors[c] | 0xc0;
+                    if (charset.blockcolors[c] > 0)
+                        charset.blockcolors[search] = (charset.blockcolors[c] & 0xf) | 0x40;
                     else
-                        charset.blockcolors[search] = (charset.blockdata[c] & 0xf) | 0xc0;
+                        charset.blockcolors[search] = (charset.blockdata[c] & 0xf) | 0x40;
 
                     ++charset.optblocks;
                     ++charset.usedblocks;
@@ -5317,7 +5326,7 @@ void drawshapebuffer(ColorBuffer& cbuf, int x, int y, unsigned char num, const Z
             unsigned char charnum = charset.blockdata[(cy&1)*512+(cx&1)*256+blocknum];
             cbuf.blocknum[(cy/2+y)*zone.sx+(cx/2+x)] = blocknum;
             cbuf.charnum[(cy+y*2)*zone.sx*2+cx+x*2] = charnum;
-            cbuf.charcolors[(cy+y*2)*zone.sx*2+cx+x*2] = blocknum < 128 ? charset.blockcolors[blocknum] : charnum&0xf;
+            cbuf.charcolors[(cy+y*2)*zone.sx*2+cx+x*2] = charset.blockcolors[blocknum] ? (charset.blockcolors[blocknum] & 0x4f) : (charnum & 0xf);
             cbuf.blockinfos[(cy/2+y)*zone.sx+(cx/2+x)] = shape.blockinfos[cy/2*MAXSHAPEBLOCKSIZE+cx/2];
         }
     }
@@ -5337,7 +5346,7 @@ void drawzonetobuffer(ColorBuffer& cbuf, const Zone& zone)
 
     for (int t = 0; t < zone.tiles.size(); ++t)
         drawshapebuffer(cbuf, zone.tiles[t].x, zone.tiles[t].y, zone.tiles[t].s, zone);
-    
+
     // Mark animating levelobjects illegal for the color optimization
     for (int c = 0; c < NUMLVLOBJ; ++c)
     {
@@ -5346,9 +5355,9 @@ void drawzonetobuffer(ColorBuffer& cbuf, const Zone& zone)
             int z2 = findzone(objects[c].x, objects[c].y);
             if (&zones[z2] == &zone)
             {
-                for (int oy = objects[c].y - zone.y; oy <= objects[c].y + objects[c].sy - zone.y; ++oy)
+                for (int oy = objects[c].y - zone.y; oy < objects[c].y + objects[c].sy - zone.y; ++oy)
                 {
-                    for (int ox = objects[c].x - zone.x; ox <= objects[c].x + objects[c].sx - zone.x; ++ox)
+                    for (int ox = objects[c].x - zone.x; ox < objects[c].x + objects[c].sx - zone.x; ++ox)
                     {
                         cbuf.charcolors[(oy*2)*zone.sx*2+ox*2] |= 0x10;
                         cbuf.charcolors[(oy*2)*zone.sx*2+ox*2+1] |= 0x10;
@@ -5495,7 +5504,7 @@ void updatenavareas(Zone& zone)
             }
         }
     }
-    
+
     zone.navareas.resize(idx);
 }
 
@@ -5513,24 +5522,24 @@ bool checkuseoptimize(const ColorBuffer& cbuf, int x, int y, const Zone& zone, b
     unsigned char cbr = getcolorfrombuffer(cbuf, cx+1, cy+1, 0);
     if (x == zone.sx-1) // At right edge rubbish gets drawn, so cannot optimize
         ret = false;
-    else if (ctl >= 0x10) // Animating block, cannot optimize self
+    else if (ctl >= 0x10) // Animating block or already optimized, cannot optimize self
         ret = false;
     else if (ctr != ctl || cbl != ctl || cbr != ctl)
         ret = false;
     else
     {
-        ret = ((getcolorfrombuffer(cbuf, cx-1, cy-1, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx+0, cy-1, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx+1, cy-1, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx+2, cy-1, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx-1, cy+2, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx+0, cy+2, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx+1, cy+2, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx+2, cy+2, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx-1, cy+0, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx-1, cy+1, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx+2, cy+0, ctl) & 0xcf) == ctl)
-            && ((getcolorfrombuffer(cbuf, cx+2, cy+1, ctl) & 0xcf) == ctl);
+        ret = (getcolorfrombuffer(cbuf, cx-1, cy-1, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx+0, cy-1, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx+1, cy-1, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx+2, cy-1, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx-1, cy+2, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx+0, cy+2, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx+1, cy+2, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx+2, cy+2, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx-1, cy+0, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx-1, cy+1, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx+2, cy+0, ctl) == ctl)
+            && (getcolorfrombuffer(cbuf, cx+2, cy+1, ctl) == ctl);
     }
 
     if (count)
@@ -5556,12 +5565,21 @@ unsigned char getcolorfrombuffer(const ColorBuffer& cbuf, int cx, int cy, unsign
 bool checkusecharcolor(const unsigned char* data, unsigned char chcol)
 {
     if (chcol < 8)
-        return true;
-    for (int y = 0; y < 8; ++y)
     {
-        if (((data[y] & 0xc) == 0xc) || ((data[y] & 0x3) == 0x3) || ((data[y] & 0xc0) == 0xc0) || ((data[y] & 0x30) == 0x30))
-            return true;
+        for (int y = 0; y < 8; ++y)
+        {
+            if (data[y])
+                return true;
+        }
     }
-    
+    else
+    {
+        for (int y = 0; y < 8; ++y)
+        {
+            if (((data[y] & 0xc) == 0xc) || ((data[y] & 0x3) == 0x3) || ((data[y] & 0xc0) == 0xc0) || ((data[y] & 0x30) == 0x30))
+                return true;
+        }
+    }
+
     return false;
 }
