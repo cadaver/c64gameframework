@@ -1424,16 +1424,21 @@ unsigned char getlegatoinstr(unsigned char instr)
 
     if (!legatostepmap[instrlastwavepos[instr]])
     {
-        if (mpwavesize >= 255)
+        if (mpwavetbl[instrlastwavepos[instr]-1] == 0x00 || mpwavetbl[instrlastwavepos[instr]-1] >= 0x90)
+            legatostepmap[instrlastwavepos[instr]] = instrlastwavepos[instr];
+        else
         {
-            printf("Out of wavetable space while converting legato instrument\n");
-            exit(1);
+            if (mpwavesize >= 255)
+            {
+                printf("Out of wavetable space while converting legato instrument\n");
+                exit(1);
+            }
+            mpwavetbl[mpwavesize] = 0xff;
+            mpnotetbl[mpwavesize] = mpnotetbl[instrlastwavepos[instr]-1];
+            mpwavenexttbl[mpwavesize] = mpwavenexttbl[instrlastwavepos[instr]-1];
+            legatostepmap[instrlastwavepos[instr]] = mpwavesize + 1;
+            ++mpwavesize;
         }
-        mpwavetbl[mpwavesize] = 0xff;
-        mpnotetbl[mpwavesize] = mpnotetbl[instrlastwavepos[instr]-1];
-        mpwavenexttbl[mpwavesize] = mpwavenexttbl[instrlastwavepos[instr]-1];
-        legatostepmap[instrlastwavepos[instr]] = mpwavesize + 1;
-        ++mpwavesize;
     }
 
     mpinsad[mpinssize] = 0;
