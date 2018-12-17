@@ -52,8 +52,8 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 - $e000-$e3ff Scorepanel charset and screen
 - $e400-$e7ff Charset's block data
 - $e800-$efff Charset's char data
-- $f000-$f23f Rest of the per-charset data
-- $f240-$f7ff Misc var area 1
+- $f000-$f2bf Rest of the per-charset data
+- $f2c0-$f7ff Misc var area 1
 - $f800-$fc00 Game screen
 - $fc00-$fc3f Empty sprite
 - $fc40-$fff9 Misc var area 2
@@ -63,7 +63,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 - The screen redraw for scrolling is based on writing both the screen data and color data at once, during a single frame, without doublebuffering.
 - The world editor can edit arbitrarily sized shapes, but these are reduced to 2x2 blocks in the C64 side world data, similar to Steel Ranger. An error is shown if the shapes don't fit to 256 chars & 256 2x2 blocks.
 - Color-per-char blocks must have the char color and the low 4 bits of the char screen code the same (inspired by QUOD INIT EXIT 2 by Retream.) Arranging the charset this way is handled automatically by the world editor. An error is also displayed if arranging the charset fails due to color-per-char blocks using too many unique chars (more than 16) with the same color. Multicolor chars that actually don't use the char color are allocated under the "wrong" char color if necessary.
-- In addition, if there are free color-per-block blocks, the editor will create "optimized" blocks which skip the color write when possible, for example empty sky. These are automatically inserted into the C64 side world data.
+- In addition, if there are free blocks, the editor will create "optimized" blocks which skip the color write when possible, for example empty sky. These are automatically inserted into the C64 side world data.
 - A level can consist of multiple scrolling zones or areas (the example game contains 2.) All the zone map datas of the current level are stored as Exomizer2 compressed within the dynamic allocation area, and when a zone is entered, the map data is depacked at the end of the dynamic memory area, just before music, for actually displaying.
 - Each zone can contain "objects" (such as doorways to other areas) and "actors" (typically items and enemies.)
 
