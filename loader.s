@@ -588,14 +588,15 @@ DrvBuildSendTbl:txa                             ;Build high nybble send table
 DrvMain:        jsr DrvGetByte                  ;Get command / filenumber
                 bpl DrvLoad
                 jmp DrvSave
-DrvLoad:        pha
-                jsr DrvCacheDir
-                pla
-                tay
-                lda drvFileSct,y
+DrvLoad:        tay
+                ldx drvFileTrk,y                ;Check if has entry for file
+                bne DrvHasEntry
+                stx DrvCacheDir+1               ;If not, reset caching
+DrvHasEntry:    jsr DrvCacheDir                 ;No-op if already cached and last file was found
+                ldy drvReceiveBuf
+                lda drvFileSct,y                ;Now check if file was actually found
                 ldx drvFileTrk,y
                 bne DrvFound
-                stx DrvCacheDir+1               ;Reset caching when not found
 DrvFileNotFound:ldx #$02                        ;Return code $02 = File not found
 DrvEndMark:     stx drvBuf+2                    ;Send endmark, return code in X
                 lda #$00
