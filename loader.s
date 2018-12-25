@@ -74,13 +74,6 @@ IL_IsPal:       lda #<NMI                       ;Set NMI vector
                 sta $0319
                 sta $fffb
                 sta $ffff
-                lda #$81                        ;Run CIA2 Timer A once to disable NMI from Restore keypress
-                sta $dd0d                       ;Timer A interrupt source
-                lda #$01                        ;Timer A count ($0001)
-                sta $dd04
-                stx $dd05
-                lda #%00011001                  ;Run Timer A in one-shot mode
-                sta $dd0e
                 lda $dc00                       ;Check for safe mode loader
                 and $dc01
                 and #$10
@@ -443,7 +436,6 @@ FastLoadEnd:
                 rend
 
 ilFastLoadEnd:
-
 
                 if ilFastLoadEnd - ilFastLoadStart > $ff
                 err
@@ -832,7 +824,7 @@ drv1581DirSct  = drvSendTbl+5                   ;Byte $03
 
 drv1541DirTrk:  dc.b 18
 
-drvReceiveBuf:
+drvReceiveBuf:  dc.b 0
 
 drvRuntimeEnd:
 
