@@ -629,22 +629,24 @@ DrawLevelObjectFrame:
                 adc #<lvlObjAnimFrames
                 sta DLOF_Lda+1
                 lda lvlObjX,y
-                sta zpDestHi
-                adc zpBitsLo
                 asl
-                sta zpBitsLo
+                sta zpDestLo                    ;zpDestLo = 16bit X-offset to maprow (multiplied by 2 due to interleaved mapdata layout)
+                lda #$00
+                rol
+                sta zpDestHi
+                asl zpBitsLo
                 lda lvlObjY,y
                 tax
                 adc zpBitsHi
                 sta zpBitsHi
-DLOF_XReload:   lda zpDestHi
-                asl
-                tay
-                lda mapTblLo,x
+DLOF_XReload:   lda mapTblLo,x                  ;C always 0 here
+                adc zpDestLo
                 sta zpSrcLo
                 lda mapTblHi,x
+                adc zpDestHi
                 sta zpSrcHi
                 sta UF_BlockUpdateFlag+1
+                ldy #$00
 DLOF_Lda:       lda lvlObjAnimFrames
                 inc DLOF_Lda+1
                 sta (zpSrcLo),y
@@ -657,8 +659,6 @@ DLOF_Lda:       lda lvlObjAnimFrames
                 bcc DLOF_XReload
                 ldx zpBitBuf
                 ldy zpLenLo
-ULO_CIPDone:
-ULO_Paused:
 DLOF_Skip:      rts
 
         ; Update level objects

@@ -296,6 +296,9 @@ MProj_YMoveZero:ldy actYH,x
                 cmp mapSizeX
                 bcs MProj_Remove
                 asl
+                bcc MProj_NoRowOverflow
+                inc zpSrcHi
+MProj_NoRowOverflow:
                 tay
                 lda (zpSrcLo),y
                 tay
@@ -309,7 +312,7 @@ MProj_NoWall:   rts                             ;C=0
 MProj_Remove:   sec
                 jmp RemoveActor
 MProj_HitWall:  lda #$ff
-BM_Done:        rts
+                rts
 
         ; Return blockinfo from actor's position with both X & Y offsets
         ;
@@ -359,10 +362,12 @@ GBI_YNotOutside:lda mapTblLo,y
                 lda mapTblHi,y
                 sta zpSrcHi
                 lda actXH,x
-GBI_Common2:    bmi GBI_OutsideHoriz
-                cmp mapSizeX
+GBI_Common2:    cmp mapSizeX
                 bcs GBI_OutsideHoriz
                 asl
+                bcc GBI_NoRowOverflow
+                inc zpSrcHi
+GBI_NoRowOverflow:
                 tay
 GBI_OutsideHorizExpandDone:
                 lda (zpSrcLo),y
