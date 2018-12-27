@@ -630,7 +630,7 @@ DrawLevelObjectFrame:
                 sta DLOF_Lda+1
                 lda lvlObjX,y
                 asl
-                sta zpDestLo                    ;zpDestLo = 16bit X-offset to maprow (multiplied by 2 due to interleaved mapdata layout)
+                sta zpDestLo                    ;zpDestLo,Hi = 16bit X-offset to maprow (multiplied by 2 due to interleaved mapdata layout)
                 lda #$00
                 rol
                 sta zpDestHi
