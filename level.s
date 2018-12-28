@@ -784,7 +784,7 @@ RCP_Loop:       jsr GetSaveMiscVar
 CenterPlayer:   lda actXH+ACTI_PLAYER
                 sec
                 sbc #9
-                bpl CP_NotOverLeft
+                bcs CP_NotOverLeft
                 lda #0
 CP_NotOverLeft: cmp SL_MapXLimit+1
                 bcc CP_NotOverRight
