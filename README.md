@@ -114,6 +114,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 - F Fill char with current color
 - V B N Swap char color (with Shift for different swaps)
 - I Show collision info
+- O Show block optimization types (color per char, color per block, optimize colorwrite away)
 - S Cycle through slope types
 - 1-8 Edit collision info (per 2x2 block within shape)
 - Ctrl+0-8 Change char color

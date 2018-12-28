@@ -306,6 +306,8 @@ void drawzoomedchar(int x, int y, const unsigned char* data, unsigned char color
 void drawshape(int x, int y, const Shape& shape, const Zone& zone);
 void drawshapeblockinfo(int x, int y, const Shape& shape);
 void drawshapeblockinfolimit(int x, int y, int lx, int ly, const Shape& shape);
+void drawshapeoptimize(int x, int y, int charsetnum, int shapenum);
+void drawshapeoptimizelimit(int x, int y, int lx, int ly, int charsetnum, int shapenum);
 void drawshapelimit(int x, int y, int lx, int ly, const Shape& shape, const Zone& zone);
 void drawzoomedshape(int x, int y, int ox, int oy, int sx, int sy, const Shape& shape, const Zone& zone);
 void drawblockinfo(int x, int y, unsigned char blockinfo);
@@ -981,6 +983,8 @@ void drawshapeselector()
                 drawshapelimit(sx, sy, 4, 4, charsets[charsetnum].shapes[num], zones[zonenum]);
                 if (win_keystate[KEY_I] && editmode != EM_ACTORS)
                     drawshapeblockinfolimit(sx, sy, 4, 4, charsets[charsetnum].shapes[num]);
+                if (win_keystate[KEY_O] && editmode != EM_ACTORS)
+                    drawshapeoptimizelimit(sx, sy, 4, 4, charsetnum, num);
                 sprintf(textbuffer, "%d", num);
                 printtext_color(textbuffer, sx, sy+24, SPR_FONTS, COL_WHITE);
 
@@ -1017,6 +1021,8 @@ void drawshapeselector()
             drawshapelimit(sx, sy, 4, 4, charsets[charsetnum].shapes[num], zones[zonenum]);
             if (win_keystate[KEY_I] && editmode != EM_ACTORS)
                 drawshapeblockinfolimit(sx, sy, 4, 4, charsets[charsetnum].shapes[num]);
+            if (win_keystate[KEY_O] && editmode != EM_ACTORS)
+                drawshapeoptimizelimit(sx, sy, 4, 4, charsetnum, num);
             sprintf(textbuffer, "%d", num);
             printtext_color(textbuffer, sx, sy+24, SPR_FONTS, COL_WHITE);
 
@@ -1035,7 +1041,7 @@ void drawshapeselector()
                         charcopycolor = charsets[charsetnum].shapes[num].charcolors[cy*MAXSHAPESIZE+cx];
                         grabmode = 0;
                     }
-                    if (key == KEY_T && grabmode != 3)
+                    if (key == KEY_T && grabmode != 3 && !shiftdown && !ctrldown)
                     {
                         int cx = (mousex&31)/8;
                         int cy = ((mousey-selectory)%31)/8;
@@ -1304,7 +1310,7 @@ void drawandeditshape()
                     grabmode = 3;
                 }
             }
-            if (key == KEY_T)
+            if (key == KEY_T && !shiftdown && !ctrldown)
             {
                 if (grabmode != 3)
                 {
@@ -1713,6 +1719,8 @@ void drawandeditshape()
     // Whole shape blockinfo debug
     if (win_keystate[KEY_I])
         drawshapeblockinfo(shapex, 0, shape);
+    if (win_keystate[KEY_O])
+        drawshapeoptimize(shapex, 0, charsetnum, shapenum);
 
     // Visualize zoomed view edges
     drawbox(shapex+osx*8-1, osy*8-1, ZOOMSHAPEVIEW*8+2, ZOOMSHAPEVIEW*8+2, 1);
@@ -1970,6 +1978,50 @@ void drawshapeblockinfolimit(int x, int y, int lx, int ly, const Shape& shape)
     {
         for (int cx = 0; cx < shape.sx/2 && cx < lx/2; ++cx)
             drawblockinfo(x+cx*16, y+cy*16, shape.blockinfos[cy*MAXSHAPEBLOCKSIZE+cx]);
+    }
+}
+
+void drawshapeoptimize(int x, int y, int charsetnum, int shapenum)
+{
+    Charset& charset = charsets[charsetnum];
+    Shape& shape = charset.shapes[shapenum];
+
+    for (int cy = 0; cy < shape.sy/2; ++cy)
+    {
+        for (int cx = 0; cx < shape.sx/2; ++cx)
+        {
+            unsigned char blocknum = charset.shapeblocks[shapenum][cy*MAXSHAPEBLOCKSIZE+cx];
+            const char* modestr = charset.blockcolors[blocknum] ? "B" : "C";
+            int c = COL_WHITE;
+            if (charset.blockcolors[blocknum] & 0x40)
+            {
+                modestr = "O";
+                c = COL_HIGHLIGHT;
+            }
+            printtext_color(modestr, x+cx*16, y+cy*16, SPR_FONTS, c);
+        }
+    }
+}
+
+void drawshapeoptimizelimit(int x, int y, int lx, int ly, int charsetnum, int shapenum)
+{
+    Charset& charset = charsets[charsetnum];
+    Shape& shape = charset.shapes[shapenum];
+
+    for (int cy = 0; cy < shape.sy/2 && cy < ly/2; ++cy)
+    {
+        for (int cx = 0; cx < shape.sx/2 && cx < lx/2; ++cx)
+        {
+            unsigned char blocknum = charset.shapeblocks[shapenum][cy*MAXSHAPEBLOCKSIZE+cx];
+            const char* modestr = charset.blockcolors[blocknum] ? "B" : "C";
+            int c = COL_WHITE;
+            if (charset.blockcolors[blocknum] & 0x40)
+            {
+                modestr = "O";
+                c = COL_HIGHLIGHT;
+            }
+            printtext_color(modestr, x+cx*16, y+cy*16, SPR_FONTS, c);
+        }
     }
 }
 
@@ -4234,8 +4286,8 @@ void savealldata()
                         int z = findzone(object.x, object.y);
                         if (z >= 0)
                             ++numobj;
-                        // Sidedoors & spawnpoints always autodeactivating (nonpersistent)
-                        if ((object.flags & 0x1c) == 0 || (object.flags & 0x1c) == 0x18)
+                        // Sidedoors always autodeactivating (nonpersistent)
+                        if ((object.flags & 0x1c) == 0)
                             object.flags |= 0x40;
                     }
                 }
@@ -5184,9 +5236,9 @@ void packcharset(int index)
                                         {
                                             ++charset.cpbblocks;
                                             charset.blockcolors[search] = (blkcol & 0xf) | 0x80; // Color per block = blockcolor with high bit set
-                                            // If block is empty, mark it optimizing right away, but neighbour blocks with actual color cannot optimize themselves
+                                            // If block is empty, mark it with an illegal color (no colorwrite), but neighbour blocks with actual color cannot optimize themselves
                                             if (!sumchardata)
-                                                charset.blockcolors[search] = 0xc0;
+                                                charset.blockcolors[search] = 0xff;
                                         }
                                         break;
                                     }
@@ -5326,7 +5378,7 @@ void drawshapebuffer(ColorBuffer& cbuf, int x, int y, unsigned char num, const Z
             unsigned char charnum = charset.blockdata[(cy&1)*512+(cx&1)*256+blocknum];
             cbuf.blocknum[(cy/2+y)*zone.sx+(cx/2+x)] = blocknum;
             cbuf.charnum[(cy+y*2)*zone.sx*2+cx+x*2] = charnum;
-            cbuf.charcolors[(cy+y*2)*zone.sx*2+cx+x*2] = charset.blockcolors[blocknum] ? (charset.blockcolors[blocknum] & 0x4f) : (charnum & 0xf);
+            cbuf.charcolors[(cy+y*2)*zone.sx*2+cx+x*2] = charset.blockcolors[blocknum] ? (charset.blockcolors[blocknum] & 0x1f) : (charnum & 0xf);
             cbuf.blockinfos[(cy/2+y)*zone.sx+(cx/2+x)] = shape.blockinfos[cy/2*MAXSHAPEBLOCKSIZE+cx/2];
         }
     }
