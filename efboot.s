@@ -468,6 +468,7 @@ SavePreserveFileEnd:
                 inx
                 bpl SavePreserveFiles
                 lda firstSaveBank               ;Erase save sector now
+                jsr $df86
                 ldy #$80
                 jsr $df83
                 lda saveFileNumber
