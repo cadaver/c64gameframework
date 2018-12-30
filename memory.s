@@ -185,6 +185,7 @@ promptType      = yLo
 
 depackBuffer    = $0100
 loadBuffer      = $0200
+StopIrq         = $02a7                         ;Kernal load/save preparation: disable IRQs / blank screen if necessary
 
 exomizerCodeStart = $0334
 
@@ -283,5 +284,5 @@ miscVarArea2    = $fc40
 
                 varrange mapTblLo,MAX_MAPROWS
                 varrange mapTblHi,MAX_MAPROWS
-                
+
                 checkvarbase $fffa

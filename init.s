@@ -24,29 +24,19 @@ IA_SwitchGetByte:
         ; Setup preparations for loading
 
                 lda loaderMode
-                bmi IA_UseFastLoad
-                bne IA_UseFakeFastLoad
-IA_UseSafeMode: ldx #StopIrqEnd-StopIrq         ;Safe mode: setup screen blanking on load begin
-IA_CopyStopIrqCode:
-                lda StopIrq-1,x
-                sta SetSpriteRange-1,x
-                dex
-                bne IA_CopyStopIrqCode
-                lda #<SetSpriteRange
-                ldx #>SetSpriteRange
-                bne IA_SetupStopIrq
-IA_UseFakeFastLoad:
-                cmp #LOAD_EASYFLASH             ;Cart loaders need no mods
-                bcs InitZeroPage
-                lda #<WaitBottom                ;Fake fastload with disk devices: wait bottom of screen on load begin
-                ldx #>WaitBottom
-IA_SetupStopIrq:sta SL_StopIrqJsr+1
-                stx SL_StopIrqJsr+2
-                bne InitZeroPage
-IA_UseFastLoad: lda #<SetSpriteRange            ;Fastload: setup safe Y-coordinate range for transfer
+                beq IA_UseSafeMode
+                bpl InitZeroPage
+IA_UseFastLoad: lda #<SetSpriteRange                        ;Fastload: setup safe Y-coordinate range for 2bit transfer
                 sta FL_SetSpriteRangeJsr+1
                 lda #>SetSpriteRange
                 sta FL_SetSpriteRangeJsr+2
+                bne InitZeroPage
+IA_UseSafeMode: ldx #stopIrqCodeEnd-stopIrqCode-1           ;Safe mode: setup screen blanking on load begin
+IA_CopyStopIrqCode:
+                lda stopIrqCode,x
+                sta StopIrq,x
+                dex
+                bpl IA_CopyStopIrqCode
 
         ; Initialize other zeropage values
 
@@ -242,14 +232,15 @@ InitRaster:     lda #<RedirectIrq               ;Setup "Kernal on" IRQ redirecto
 
                 rts
 
-        ; Silence SID, clear sprites, and stop raster IRQs. Used when beginning slowloading operation
+        ; Silence SID, blank screen & and stop raster IRQs. Used when beginning fallback mode loading
 
-StopIrq:        jsr WaitBottom
+stopIrqCode:
+                jsr WaitBottom
                 jsr SilenceSID
                 sta $d01a                       ;Raster IRQs off
                 sta $d011                       ;Blank screen completely
                 rts
-StopIrqEnd:
+stopIrqCodeEnd:
 
                 if NTSCSIZEREDUCE > 0
 

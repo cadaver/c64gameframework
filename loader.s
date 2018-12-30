@@ -87,6 +87,11 @@ IL_NoFastLoad:  lda #<(ilSlowLoadStart-1)
                 sta IL_CopyLoaderCode+1
                 lda #>(ilSlowLoadStart-1)
                 sta IL_CopyLoaderCode+2
+                ldx #ilStopIrqCodeEnd-ilStopIrqCodeStart-1
+IL_CopyStopIrq: lda ilStopIrqCodeStart,x       ;Default IRQ stop code for Kernal loading: just wait for bottom of screen
+                sta StopIrq,x
+                dex
+                bpl IL_CopyStopIrq
                 jmp IL_Done
 
 IL_DetectDrive: lda #$aa
@@ -159,32 +164,53 @@ ilSlowLoadStart:
 
                 rorg OpenFile
 
+        ; Open file
+        ;
+        ; Parameters: fileNumber
+        ; Returns: -
+        ; Modifies: A,X,Y
+
                 jmp SlowOpen
+
+        ; Save file
+        ;
+        ; Parameters: A,X startaddress, zpBitsLo-Hi amount of bytes, fileNumber
+        ; Returns: -
+        ; Modifies: A,X,Y
+
                 jmp SlowSave
+
+        ; Read a byte from an opened file
+        ;
+        ; Parameters: -
+        ; Returns: if C=0, byte in A. If C=1, EOF/errorcode in A:
+        ; $00 - EOF (no error)
+        ; $02 - File not found
+        ; $80 - Device not present
+        ; Modifies: A,X
 
 SlowGetByte:    lda fileOpen
                 beq SGB_Closed
                 lda #$36
                 sta $01
                 jsr ChrIn
-                pha
-                lda status
+                ldx status
                 bne SGB_EOF
                 dec $01
-SGB_LastByte:   pla
-                clc
+SGB_LastByte:   clc
 SO_Done:        rts
 SGB_EOF:        pha
+                txa
+                and #$83
+                sta SGB_Closed+1
                 tya
                 pha
                 jsr CloseKernalFile
                 pla
                 tay
                 pla
-                and #$83
-                sta SGB_Closed+1
+                ldx SGB_Closed+1
                 beq SGB_LastByte
-                pla
 SGB_Closed:     lda #$00
                 sec
                 rts
@@ -240,6 +266,7 @@ PrepareKernalIO:inc fileOpen                    ;Set fileopen indicator, raster 
                 sta $d07a                       ;SCPU to slow mode
                 sta $d030                       ;C128 back to 1MHz mode
                 endif
+                jsr StopIrq
                 lda fileNumber                  ;Convert filename
                 pha
                 and #$0f
@@ -252,7 +279,6 @@ PrepareKernalIO:inc fileOpen                    ;Set fileopen indicator, raster 
                 lsr
                 dex
                 jsr CFN_Sub
-SL_StopIrqJsr:  jsr StopIrqDummy
 KernalOnFast:   lda #$36
                 sta $01
 StopIrqDummy:   rts
@@ -283,6 +309,16 @@ SlowLoadEnd:
                 rend
 
 ilSlowLoadEnd:
+
+ilStopIrqCodeStart:
+
+                rorg StopIrq
+StopIrqWait:    lda $d011
+                bpl StopIrqWait                 ;Wait until bottom to make sure IRQ's adjust themselves to fileOpen flag
+                rts
+                rend
+
+ilStopIrqCodeEnd:
 
         ; Fast fileopen / getbyte / save routines
 

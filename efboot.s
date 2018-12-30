@@ -12,16 +12,18 @@ FIRSTSAVEFILE   = $78
 MAXSAVEFILES    = 8
 MAXSAVEPAGES    = 8                             ;How much the savefiles can take RAM in total (during preserve & erase)
 
-Startup         = $0200
-EasyAPI         = $c000
-SaveCode        = $c300
-EasyAPIInit     = $c014
-
+CrtLoader       = $0200
+Startup         = $0500
+irqVectors      = $0314
 fileStartLo     = $8000
 fileStartHi     = $8080
 fileSizeLo      = $8100
 fileSizeHi      = $8180
 fileSaveStart   = $81ff
+
+EasyAPI         = $c000
+EasyAPIInit     = $c014
+SavePreserveErase = $c300
 
 saveSrcLo       = xLo
 saveSrcHi       = yLo
@@ -37,297 +39,126 @@ ColdStart:      sei
                 ldx #$ff
                 txs
                 cld
-
-        ; Enable VIC (e.g. RAM refresh)
-
-                lda #8
+                lda #8                          ;Enable VIC (e.g. RAM refresh)
                 sta $d016
-
-        ; Write to RAM to make sure it starts up correctly (=> RAM datasheets)
-
-WaitRAM:        sta $0100,x
+WaitRAM:        sta $0100,x                     ;Write to RAM to make sure it starts up correctly (=> RAM datasheets)
                 dex
                 bne WaitRAM
-
-        ; Copy the rest of the startup & loader code to ram
-
-CopyStartup:    lda startupCode,x
-                sta Startup,x
-                lda startupCode+$100,x
-                sta Startup+$100,x
-                lda startupCode+$200,x
-                sta Startup+$200,x
+CopyLoader:     lda crtLoaderCodeStart,x        ;Copy rest of the startup code to ram
+                sta CrtLoader,x
+                lda crtLoaderCodeStart+$100,x
+                sta CrtLoader+$100,x
+                lda crtLoaderCodeStart+$200,x
+                sta CrtLoader+$200,x
+                lda crtLoaderCodeStart+$300,x
+                sta CrtLoader+$300,x
                 inx
-                bne CopyStartup
+                bne CopyLoader
                 jmp Startup
 
-startupCode:
+preserveEraseCode:
 
-                rorg Startup
+                rorg SavePreserveErase
 
-                lda #EASYFLASH_16K + EASYFLASH_LED
-                sta $de02
-
-        ; Prepare the CIA to scan the keyboard
-
-                lda #$7f
-                sta $dc00   ; pull down row 7 (DPA)
-
-                ldx #$ff
-                stx $dc02   ; DDRA $ff = output
-                inx
-                stx $dc03   ; DDRB $00 = input
-
-        ; Read the keys pressed on this row
-
-                lda $dc01   ; read coloumns (DPB)
-
-        ; Restore CIA registers to the state after (hard) reset
-
-                stx $dc02   ; DDRA input again
-                stx $dc00   ; Now row pulled down
-
-        ; Check if one of the magic kill keys was pressed
-
-                and #$e0    ; only leave "Run/Stop", "Q" and "C="
-                cmp #$e0
-                beq NoKill    ; branch if one of these keys is pressed
-
-Kill:           lda #EASYFLASH_KILL
-                sta $de02
-                jmp ($fffc) ; reset
-
-NoKill:         ldx #$00
-                stx $d016
-                jsr $ff84   ; Initialise I/O
-                ldx #$00
-                stx ntscFlag
+                lda fileNumber                  ;No space, must erase
+                sta saveFileNumber
+                lda #<saveRamStart
+                sta zpDestLo
+                lda #>saveRamStart
+                sta zpDestHi
+                ldx #FIRSTSAVEFILE
+SavePreserveFiles:
                 stx fileNumber
-                stx $d015
-                stx $d020
-                stx $d021
-                stx $d07f                       ;Disable SCPU hardware regs
-                stx $d07a                       ;SCPU to slow mode
-                stx fileOpen                    ;Clear loader ZP vars
-                lda #$18
-                sta $d016
-                lda #LOAD_EASYFLASH             ;Loader needs no mods
-                sta loaderMode
-                lda #$7f
-                sta $dc0d                       ;Disable & acknowledge IRQ sources (Y=$7f)
-                lda $dc0d
-                lda #$0b
-                sta $d011                       ;Blank screen
-DetectNtsc1:    lda $d012                       ;Detect PAL/NTSC
-DetectNtsc2:    cmp $d012
-                beq DetectNtsc2
-                bmi DetectNtsc1
-                cmp #$20
-                bcs IsPal
-                inc ntscFlag
-IsPal:          lda #<NMI                       ;Set NMI vector
-                sta $0318
-                sta $fffa
-                sta $fffe
-                lda #>NMI
-                sta $0319
-                sta $fffb
-                sta $ffff
-                lda #$81                        ;Run Timer A once to disable NMI from Restore keypress
-                sta $dd0d                       ;Timer A interrupt source
-                lda #$01                        ;Timer A count ($0001)
-                sta $dd04
-                stx $dd05
-                lda #%00011001                  ;Run Timer A in one-shot mode
-                sta $dd0e
                 lda #$00
-                sta $de00
-                lda fileSaveStart
-                sta firstSaveBank
-                lda #$35                        ;ROMs off
-                sta $01
-                lda #>(loaderCodeEnd-1)         ;Store mainpart entrypoint to stack
-                pha
-                tax
-                lda #<(loaderCodeEnd-1)
-                pha
-                lda #<loaderCodeEnd
-                jmp LoadFile                    ;Load mainpart (overwrites loader init)
-
-initCodeEnd:    ds.b $300-initCodeEnd,$ff
-
-FileOpenSub:    inc fileOpen
-                ldx #$00
-                stx $d07a                       ;SCPU to slow mode
-                stx $d030                       ;C128 back to 1MHz mode
-                stx $de00                       ;Directory bank
-                lda #$37
-                sta $01                         ;Cart ROM accessible
-                rts
-
-NMI:            rti
-
-firstSaveBank:  dc.b 0
-
-                ds.b 6,$ff                      ;Interrupt vectors when Kernal is on
-
-CopySaveCode:   lda $01
-                sta loadTempReg                 ;Preserve $01
-                jsr FileOpenSub                 ;Make sure no turbo mode during save
-CopySaveCodeLoop:
-                lda $b600,x                     ;Copy rest of save routine to RAM
-                sta SaveCode,x
-                lda $b700,x
-                sta SaveCode+$100,x
-                inx
-                bne CopySaveCodeLoop
-                jmp SaveCode                    ;Jump into the rest of the save code
-
-helperCodeEnd:  ds.b exomizerCodeStart-helperCodeEnd,$ff
-
-                include exomizer.s
-
-exomizerCodeEnd:ds.b OpenFile-exomizerCodeEnd,$ff
-
-                jmp OpenFileEF
-                jmp SaveFileEF
-GetByte:        ldx loadBufferPos
-                lda loadBuffer,x
-GB_EndCmp:      cpx #$00
-                bcs GB_FillBuffer
-                inc loadBufferPos
-                rts
-
-GB_FillBuffer:  ldx fileOpen
-                beq GB_EOF
-                ldx GB_Sectors+1
-                cpx #$ff
-                bne GB_FillBufferOK
-GB_CloseFile:   dec fileOpen                    ;Last byte was read, mark file closed
-                clc
-                rts
-GB_FillBufferOK:pha
-                lda $01
-                pha
-                lda #$37                        ;Enable cart ROM to get file data
-                sta $01
-GB_BankNum:     lda #$00
-                sta $de00
-                ldx #$00                        ;Reset sector read pointer
-                stx loadBufferPos
-GB_SectorLda:   lda $8000,x
-                sta loadBuffer,x
-                inx
-                bne GB_SectorLda
-                dex                             ;End compare value for full sectors
-GB_Sectors:     lda #$00                        ;Full sectors remaining
-                bne GB_MoreSectors
-GB_LastSector:  ldx #$00
-GB_MoreSectors: stx GB_EndCmp+1
-                dec GB_Sectors+1
-                ldx GB_SectorLda+2
-                inx
-GB_BankEndCmp:  cpx #$c0
-                bcc GB_NoNextBank
-                ldx #$80
-                inc GB_BankNum+1
-GB_NoNextBank:  stx GB_SectorLda+2
-GB_Restore01:   pla
-                sta $01
-                pla
-                clc
-                rts
-GB_EOF:         txa                             ;File ended successfully, C=1 & A=0
-OpenFileSkip:   rts
-
-OpenFileEF:     lda fileOpen                    ;Skip if already open
-                bne OpenFileSkip
-                pha                             ;Push one extra for FillBuffer
-                lda $01
-                pha
-                jsr FileOpenSub
+                sta zpBitsLo
+                sta zpBitsHi                    ;Current file length
+                cpx saveFileNumber
+                beq SavePreserveFileEnd         ;Do not preserve the file we'll overwrite now
+                jsr OpenFile
+                lda zpDestLo
+                sta saveFileAdrLo-FIRSTSAVEFILE,x
+                lda zpDestHi
+                sta saveFileAdrHi-FIRSTSAVEFILE,x
+                ldy #$00
+SavePreserveFileLoop:
+                jsr GetByte
+                bcs SavePreserveFileEnd
+                sta (zpDestLo),y                ;Store file bytes to RAM
+                inc zpDestLo
+                bne SavePreserveNotOver
+                inc zpDestHi
+SavePreserveNotOver:
+                inc zpBitsLo
+                bne SavePreserveFileLoop
+                inc zpBitsHi
+                bne SavePreserveFileLoop
+SavePreserveFileEnd:
+                ldx #$37
+                stx $01
                 ldx fileNumber
-                cpx #FIRSTSAVEFILE
-                bcs OF_SaveFile                 ;Save files handled differently
-                lda fileStartHi,x
-                sta GB_BankNum+1
-                lda fileStartLo,x
-                sta GB_SectorLda+2
-                lda fileSizeLo,x
-                ldy fileSizeHi,x
-                ldx #$c0                        ;Static files use both low & high chip
-OF_StoreSectorCount:
-                sta GB_LastSector+1
-                stx GB_BankEndCmp+1
-                sty GB_Sectors+1
-                jmp GB_BankNum                  ;Transfer first sector
-
-OF_SaveFile:    lda firstSaveBank               ;Get save directory bank
-                sta $de00
-                txa
-                ldx #$02
-OF_SaveLoop:    cmp $8000,x
-                beq OF_SaveFound
+                lda zpBitsLo
+                sta saveFileLenLo-FIRSTSAVEFILE,x
+                lda zpBitsHi
+                sta saveFileLenHi-FIRSTSAVEFILE,x
                 inx
-                bne OF_SaveLoop
-                dec fileOpen                    ;Savefile doesn't exist, close file
-                beq GB_MoreSectors
-OF_SaveFound:   txa
-                and #$1f
-                ora #$80
-                sta GB_SectorLda+2              ;Savefile sector within bank
-                txa
-                ldy #$05
-OF_BankLoop:    lsr
-                dey
-                bne OF_BankLoop
-                ora firstSaveBank               ;Savefile start bank
-                sta GB_BankNum+1
-OF_SaveLengthLoop:
-                lda $8001,x                     ;Check how far the savefile continues
-                cmp fileNumber
-                bne OF_SaveEndFound
+                bpl SavePreserveFiles
+                lda firstSaveBank               ;Erase save sector now
+                jsr $df86
+                ldy #$80
+                jsr $df83
+                lda saveFileNumber
+                sta fileNumber
+                jsr SaveFileSub                 ;Proceed to save the current file first
+                ldx #FIRSTSAVEFILE
+SavePreservedFiles:
+                stx fileNumber                  ;Then save all preserved files with nonzero length
+                lda saveFileLenLo-FIRSTSAVEFILE,x
+                ora saveFileLenHi-FIRSTSAVEFILE,x
+                beq SavePreservedFileSkip
+                lda saveFileAdrLo-FIRSTSAVEFILE,x
+                sta saveSrcLo
+                lda saveFileAdrHi-FIRSTSAVEFILE,x
+                sta saveSrcHi
+                lda saveFileLenLo-FIRSTSAVEFILE,x
+                sta saveSizeLo
+                lda saveFileLenHi-FIRSTSAVEFILE,x
+                sta saveSizeHi
+                jsr SaveFileSub
+SavePreservedFileSkip:
+                ldx fileNumber
                 inx
-                iny
-                bne OF_SaveLengthLoop
-OF_SaveEndFound:lda $8100,x                     ;Length of last sector was stored when saving
-                ldx #$a0                        ;Savefiles use only the low chip
-                bne OF_StoreSectorCount
+                bpl SavePreservedFiles
+                rts
 
-SaveFileEF:     sta saveSrcLo                   ;Preserve save address
-                stx saveSrcHi
-                jmp CopySaveCode
-
-crtLoadCodeEnd:
-
-                if crtLoadCodeEnd > ntscFlag
-                    err
-                endif
+saveFileAdrLo:  ds.b MAXSAVEFILES,0
+saveFileAdrHi:  ds.b MAXSAVEFILES,0
+saveFileLenLo:  ds.b MAXSAVEFILES,0
+saveFileLenHi:  ds.b MAXSAVEFILES,0
 
                 rend
 
-startupCodeEnd: ds.b $f600-startupCodeEnd,$ff
+preserveEraseCodeEnd:
 
-                org $f600
-saveCodeStart:
+crtLoaderCodeStart:
 
-                rorg SaveCode
+                rorg CrtLoader
 
+SaveFileEF:     sta saveSrcLo
+                stx saveSrcHi
                 lda zpBitsLo                    ;Purge overwrites these, so copy elsewhere
                 sta saveSizeLo
                 lda zpBitsHi
                 sta saveSizeHi
-                lda loadTempReg
-                sta $01                         ;Momentarily restore RAM so resource files will be moved correctly
                 lda #<saveRamStart
                 sta zoneBufferLo
                 lda #>saveRamStart
                 sta zoneBufferHi
                 jsr PurgeUntilFreeNoNew         ;Make room for all save files in case we need to preserve+erase
-                lda #$37
-                sta $01
+                jsr FileOpenSub                 ;ROM on, turbo mode off
                 ldx #$00
-CopyEasyAPI:    lda $b800,x                     ;Copy EasyAPI to RAM
+CopyEasyAPI:    lda preserveEraseCode-$4000,x
+                sta SavePreserveErase,x
+                lda $b800,x                     ;Copy EasyAPI to RAM
                 sta EasyAPI,x
                 lda $b900,x
                 sta EasyAPI+$100,x
@@ -339,7 +170,7 @@ CopyEasyAPI:    lda $b800,x                     ;Copy EasyAPI to RAM
                 jsr SilenceSID
                 sta $d01a
                 sta $d011
-                sta fileOpen                    ;Preserve/erase needs to open further files, so clear fileopen flag already (IRQs disabled, no risk of reentering turbo mode)
+                sta fileOpen                    ;Preserve/erase needs to open further files, so clear fileopen flag (IRQs disabled, no risk of reentering turbo mode)
                 jsr EasyAPIInit                 ;Init EasyAPI
                 bcc SaveInitOK
                 lda #$02
@@ -348,9 +179,7 @@ CopyEasyAPI:    lda $b800,x                     ;Copy EasyAPI to RAM
 SaveInitOK:     jsr SaveFileSub
 SaveExit:       lda #EASYFLASH_16K+EASYFLASH_LED ;Restore LED
                 sta $de02
-                lda loadTempReg
-                sta $01                         ;Restore $01 value
-                rts                             ;Done!
+                jmp Restore01
 
 SaveFileSub:    lda firstSaveBank
                 sta $de00
@@ -362,7 +191,7 @@ SaveSeekEmpty:  lda $8000,x                     ;Search for unused file slot
 SaveSeekEmptyNext:
                 inx
                 bne SaveSeekEmpty
-                jmp SavePreserveAndErase
+                jmp SavePreserveErase
 SaveEmptyFound: stx saveStartPos
                 ldx #$02
                 ldy #$80
@@ -410,7 +239,7 @@ SaveBankLoop:   lsr
                 ldy #$00
                 lda saveSizeLo
                 beq SavePreDecrement
-SaveLoop:       ldx loadTempReg                 ;Switch to RAM to read
+SaveLoop:       ldx #$35                        ;Switch to RAM to read
                 stx $01
                 lda (saveSrcLo),y
                 ldx #$37
@@ -426,91 +255,219 @@ SavePreDecrement:
                 bpl SaveLoop
                 rts
 
-SavePreserveAndErase:
-                lda fileNumber                  ;No space, must erase
-                sta saveFileNumber
-                lda #<saveRamStart
-                sta zpDestLo
-                lda #>saveRamStart
-                sta zpDestHi
-                ldx #FIRSTSAVEFILE
-SavePreserveFiles:
-                stx fileNumber
-                lda #$00
-                sta zpBitsLo
-                sta zpBitsHi                    ;Current file length
-                cpx saveFileNumber
-                beq SavePreserveFileEnd         ;Do not preserve the file we'll overwrite now
-                jsr OpenFile
-                lda zpDestLo
-                sta saveFileAdrLo-FIRSTSAVEFILE,x
-                lda zpDestHi
-                sta saveFileAdrHi-FIRSTSAVEFILE,x
-                ldy #$00
-SavePreserveFileLoop:
-                jsr GetByte
-                bcs SavePreserveFileEnd
-                sta (zpDestLo),y                ;Store file bytes to RAM
-                inc zpDestLo
-                bne SavePreserveNotOver
-                inc zpDestHi
-SavePreserveNotOver:
-                inc zpBitsLo
-                bne SavePreserveFileLoop
-                inc zpBitsHi
-                bne SavePreserveFileLoop
-SavePreserveFileEnd:
-                ldx fileNumber
-                lda zpBitsLo
-                sta saveFileLenLo-FIRSTSAVEFILE,x
-                lda zpBitsHi
-                sta saveFileLenHi-FIRSTSAVEFILE,x
-                inx
-                bpl SavePreserveFiles
-                lda firstSaveBank               ;Erase save sector now
-                jsr $df86
-                ldy #$80
-                jsr $df83
-                lda saveFileNumber
-                sta fileNumber
-                jsr SaveFileSub                 ;Proceed to save the current file first
-                ldx #FIRSTSAVEFILE
-SavePreservedFiles:
-                stx fileNumber                  ;Then save all preserved files with nonzero length
-                lda saveFileLenLo-FIRSTSAVEFILE,x
-                ora saveFileLenHi-FIRSTSAVEFILE,x
-                beq SavePreservedFileSkip
-                lda saveFileAdrLo-FIRSTSAVEFILE,x
-                sta saveSrcLo
-                lda saveFileAdrHi-FIRSTSAVEFILE,x
-                sta saveSrcHi
-                lda saveFileLenLo-FIRSTSAVEFILE,x
-                sta saveSizeLo
-                lda saveFileLenHi-FIRSTSAVEFILE,x
-                sta saveSizeHi
-                jsr SaveFileSub
-SavePreservedFileSkip:
-                ldx fileNumber
-                inx
-                bpl SavePreservedFiles
+FileOpenSub:    lda $d011                       ;Wait until bottom so that panelsplit IRQ will know to take advance
+                bpl FileOpenSub
+                inc fileOpen
+                ldx #$37
+                stx $01                         ;Cart ROM accessible
+                ldx #$00
+                stx $d07a                       ;SCPU to slow mode
+                stx $d030                       ;C128 back to 1MHz mode
+                stx $de00                       ;Directory bank
                 rts
 
-saveFileAdrLo:  ds.b MAXSAVEFILES,0
-saveFileAdrHi:  ds.b MAXSAVEFILES,0
-saveFileLenLo:  ds.b MAXSAVEFILES,0
-saveFileLenHi:  ds.b MAXSAVEFILES,0
+NMI:            rti
+
+firstSaveBank:  dc.b 0
 saveFileNumber: dc.b 0
 saveStartPos:   dc.b 0
 
+saveImplCodeEnd:ds.b irqVectors-saveImplCodeEnd,$ff
+
+irqVectors:     dc.w NMI
+                dc.w NMI
+                dc.w NMI
+
+irqVectorsEnd:  ds.b LoadFile-irqVectorsEnd,$ff
+
+                include exomizer.s
+
+exomizerCodeEnd:ds.b OpenFile-exomizerCodeEnd,$ff
+
+                jmp OpenFileEF
+                jmp SaveFileEF
+GetByte:        ldx #$37
+                stx $01
+                ldx loadBufferPos
+GB_SectorLda:   lda $8000,x
+GB_EndCmp:      cpx #$00
+                bcs GB_FillBuffer
+                inc loadBufferPos
+Restore01:      ldx #$35
+                stx $01
+OpenFileSkip:   rts
+
+GB_FillBuffer:  ldx fileOpen
+                beq GB_EOF
+                ldx GB_Sectors+1
+                cpx #$ff
+                bne GB_FillBufferOK
+GB_CloseFile:   dec fileOpen                    ;Last byte was read, mark file closed
+                clc
+                bcc Restore01
+GB_FillBufferOK:ldx GB_SectorLda+2
+                inx
+GB_BankEndCmp:  cpx #$c0
+                bcc GB_NoNextBank
+                ldx #$80
+                inc GB_BankNum+1
+GB_NoNextBank:  stx GB_SectorLda+2
+GB_BankNum:     ldx #$00
+                stx $de00
+                ldx #$00                        ;Reset sector read pointer
+                stx loadBufferPos
+GB_Sectors:     ldx #$00                        ;Full sectors remaining
+                bne GB_MoreSectors
+GB_LastSector:  ldx #$00
+                skip2
+GB_MoreSectors: ldx #$ff
+                stx GB_EndCmp+1
+                dec GB_Sectors+1
+                clc
+                bcc Restore01
+GB_EOF:         txa                             ;File ended successfully, C=1 & A=0
+OF_SaveNotFound:beq Restore01
+
+OpenFileEF:     lda fileOpen                    ;Skip if already open
+                bne OpenFileSkip
+                jsr FileOpenSub
+                lda fileSaveStart               ;Get the save bank from the directory
+                sta firstSaveBank
+                ldx fileNumber
+                cpx #FIRSTSAVEFILE
+                bcs OF_SaveFile                 ;Save files handled differently
+                lda fileStartHi,x
+                sta GB_BankNum+1
+                lda fileStartLo,x
+                sta GB_SectorLda+2
+                lda fileSizeLo,x
+                ldy fileSizeHi,x
+                ldx #$c0                        ;Static files use both low & high chip
+OF_StoreSectorCount:
+                sta GB_LastSector+1
+                stx GB_BankEndCmp+1
+                sty GB_Sectors+1
+                jmp GB_BankNum                  ;Init transfer from first sector
+
+OF_SaveFile:    lda firstSaveBank               ;Get save directory bank
+                sta $de00
+                txa
+                ldx #$02
+OF_SaveLoop:    cmp $8000,x
+                beq OF_SaveFound
+                inx
+                bne OF_SaveLoop
+                dec fileOpen                    ;Savefile doesn't exist, close file
+                stx GB_EndCmp+1
+                beq OF_SaveNotFound
+OF_SaveFound:   txa
+                and #$1f
+                ora #$80
+                sta GB_SectorLda+2              ;Savefile sector within bank
+                txa
+                ldy #$05
+OF_BankLoop:    lsr
+                dey
+                bne OF_BankLoop
+                ora firstSaveBank               ;Savefile start bank
+                sta GB_BankNum+1
+OF_SaveLengthLoop:
+                lda $8001,x                     ;Check how far the savefile continues
+                cmp fileNumber
+                bne OF_SaveEndFound
+                inx
+                iny
+                bne OF_SaveLengthLoop
+OF_SaveEndFound:lda $8100,x                     ;Length of last sector was stored when saving
+                ldx #$a0                        ;Savefiles use only the low chip
+                bne OF_StoreSectorCount
+
+crtLoaderRuntimeEnd:
+
+                if crtLoaderRuntimeEnd > ntscFlag
+                    err
+                endif
+
+                ds.b Startup-crtLoaderRuntimeEnd,$ff
+
+Startup:        lda #EASYFLASH_16K + EASYFLASH_LED
+                sta $de02
+                lda #$7f
+                sta $dc00   ; pull down row 7 (DPA)
+                ldx #$ff
+                stx $dc02   ; DDRA $ff = output
+                inx
+                stx $dc03   ; DDRB $00 = input
+                lda $dc01   ; read coloumns (DPB)
+                stx $dc02   ; DDRA input again
+                stx $dc00   ; Now row pulled down
+                and #$e0    ; only leave "Run/Stop", "Q" and "C="
+                cmp #$e0
+                beq NoKill    ; branch if one of these keys is pressed
+Kill:           lda #EASYFLASH_KILL
+                sta $de02
+                jmp ($fffc) ; reset
+NoKill:         ldx #$00
+                stx $d016
+                jsr $ff84   ; Initialise I/O
+                ldx #$00
+                stx ntscFlag
+                stx fileNumber
+                stx $d015
+                stx $d020
+                stx $d021
+                stx $d07f                       ;Disable SCPU hardware regs
+                stx $d07a                       ;SCPU to slow mode
+                stx fileOpen                    ;Clear loader ZP vars
+                lda #$18
+                sta $d016
+                lda #LOAD_EASYFLASH             ;Loader needs no mods
+                sta loaderMode
+                lda #$7f
+                sta $dc0d                       ;Disable & acknowledge IRQ sources (Y=$7f)
+                lda $dc0d
+                lda $d011
+                and #$0f
+                sta $d011                       ;Blank screen
+DetectNtsc1:    lda $d012                       ;Detect PAL/NTSC
+DetectNtsc2:    cmp $d012
+                beq DetectNtsc2
+                bmi DetectNtsc1
+                cmp #$20
+                bcs IsPal
+                inc ntscFlag
+IsPal:          lda #<NMI                       ;Set NMI vector
+                sta $fffa
+                sta $fffe
+                lda #>NMI
+                sta $fffb
+                sta $ffff
+                lda #$81                        ;Run Timer A once to disable NMI from Restore keypress
+                sta $dd0d                       ;Timer A interrupt source
+                lda #$01                        ;Timer A count ($0001)
+                sta $dd04
+                stx $dd05
+                lda #%00011001                  ;Run Timer A in one-shot mode
+                sta $dd0e
+                ldx #$35                        ;ROMs off
+                stx $01
+                lda #>(loaderCodeEnd-1)         ;Store mainpart entrypoint to stack
+                pha
+                tax
+                lda #<(loaderCodeEnd-1)
+                pha
+                lda #<loaderCodeEnd
+                jmp LoadFile                    ;Load mainpart (overwrites loader init)
+
                 rend
 
-saveCodeEnd:    ds.b $f800-saveCodeEnd,$ff
+crtLoaderCodeEnd:
+                ds.b $f800-crtLoaderCodeEnd,$ff
 
                 org $f800
                 incbin eapi-am29f040-14.bin
 
                 org $fb00
-
                 dc.b $65,$66,$2d,$6e,$41,$4d,$45,$3a
                 dc.b "eXAMPLE gAME",0,0,0,0
 
