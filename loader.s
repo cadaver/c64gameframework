@@ -191,7 +191,6 @@ ilSlowLoadStart:
 
 SlowGetByte:    lda fileOpen
                 beq SGB_Closed
-                lda #$36
                 sta $01
                 jsr ChrIn
                 ldx status
@@ -203,11 +202,9 @@ SGB_EOF:        pha
                 txa
                 and #$83
                 sta SGB_Closed+1
-                tya
-                pha
+                sty loadBufferPos
                 jsr CloseKernalFile
-                pla
-                tay
+                ldy loadBufferPos
                 pla
                 ldx SGB_Closed+1
                 beq SGB_LastByte
@@ -256,17 +253,20 @@ SS_PreDecrement:dec zpBitsHi
 
 CloseKernalFile:lda #$02
                 jsr Close
-                dec fileOpen
+                lda #$00
+                sta fileOpen
                 dec $01
                 rts
 
-PrepareKernalIO:inc fileOpen                    ;Set fileopen indicator, raster delays are to be expected
+PrepareKernalIO:jsr StopIrq
+                lda #$36
+                sta fileOpen                    ;Set fileopen indicator, raster delays are to be expected
+                sta $01
                 if USETURBOMODE > 0
                 lda #$00
                 sta $d07a                       ;SCPU to slow mode
                 sta $d030                       ;C128 back to 1MHz mode
                 endif
-                jsr StopIrq
                 lda fileNumber                  ;Convert filename
                 pha
                 and #$0f
@@ -278,10 +278,12 @@ PrepareKernalIO:inc fileOpen                    ;Set fileopen indicator, raster 
                 lsr
                 lsr
                 dex
-                jsr CFN_Sub
-KernalOnFast:   lda #$36
-                sta $01
-StopIrqDummy:   rts
+CFN_Sub:        ora #$30
+                cmp #$3a
+                bcc CFN_Number
+                adc #$06
+CFN_Number:     sta fileName,x
+                rts
 
 SetFileName:    lda #$02
                 ldx #<fileName
@@ -292,13 +294,6 @@ SetLFSOpen:     ldx fa
                 jsr SetLFS
                 jsr Open
                 ldx #$02
-                rts
-
-CFN_Sub:        ora #$30
-                cmp #$3a
-                bcc CFN_Number
-                adc #$06
-CFN_Number:     sta fileName,x
                 rts
 
 scratch:        dc.b "S0:"
