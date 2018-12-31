@@ -127,7 +127,9 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 - Shift+Ins Insert shape
 - Shift+Del Delete shape
 - Ctrl+Shift+T Insert-move last copied shape at current shape
-  Ctrl+Shift+P (at palette editor, when mouse is over color) Swap colors globally in charset
+- Ctrl+Shift+P (at palette editor, when mouse is over color) Swap colors globally in charset
+- Ctrl+Shift+I Charset insert
+- Ctrl+Shift+U Remove unused shapes from charset
 
 ### Map editor
 
@@ -224,7 +226,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 
 ## License
 
-Copyright (c) 2018 Lasse Öörni
+Copyright (c) 2018-2019 Lasse Öörni
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

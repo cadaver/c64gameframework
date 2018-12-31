@@ -373,6 +373,7 @@ std::vector<unsigned char> exomize(unsigned char* data, int datasize);
 std::vector<unsigned char> rlepack(unsigned char* data, int datasize);
 void exportpng();
 void nukecharset();
+void optimizecharset();
 void packcharset(int index);
 void drawc64shape(int x, int y, unsigned char num, const Zone& zone, const Charset& charset, unsigned char* dest);
 
@@ -1650,7 +1651,7 @@ void drawandeditshape()
         resetshape(shape);
         charset.dirty = true;
     }
-    
+
     // Shape insert/delete
     if (key == KEY_DEL && shiftdown)
         deleteshape(shapenum);
@@ -1660,6 +1661,9 @@ void drawandeditshape()
     // Charset insert
     if (key == KEY_I && shiftdown && ctrldown)
         insertcharset();
+    // Charset optimize (remove unused)
+    if (key == KEY_U && shiftdown && ctrldown)
+        optimizecharset();
 
     // Whole shape fill
     if (key == KEY_F && shiftdown)
@@ -3753,6 +3757,26 @@ void insertcharset()
     }
 }
 
+void optimizecharset()
+{
+    if (shapeusedirty)
+        updateshapeuse();
+
+    int c;
+    // Find last used shape
+    for (c = NUMSHAPES-1; c >= 0; --c)
+    {
+        if (charsets[charsetnum].shapes[c].usecount)
+            break;
+    }
+    // Then remove all unused from it to beginning
+    for (; c >= 0; --c)
+    {
+        if (!charsets[charsetnum].shapes[c].usecount)
+            deleteshape(c);
+    }
+}
+
 void insertshape()
 {
     for (int z = 0; z < NUMZONES; ++z)
@@ -3833,6 +3857,23 @@ void updateshapeuse()
 
             for (int t = 0; t < zone.tiles.size(); ++t)
                 ++charsets[zone.charset].shapes[zone.tiles[t].s].usecount;
+        }
+    }
+
+    // Count shape use from animated levelobjects
+    for (int c = 0; c < NUMLVLOBJ; ++c)
+    {
+        const Object& obj = objects[c];
+        if (obj.sx && obj.sy && obj.frames > 1)
+        {
+            int z = findzone(obj.x, obj.y);
+            if (z >= 0)
+            {
+                const Zone& zone = zones[z];
+                int t = findobjectshape(obj.x, obj.y, zone);
+                for (int s = t; s < t + obj.frames && s < NUMSHAPES; ++s)
+                    ++charsets[zone.charset].shapes[s].usecount;
+            }
         }
     }
 
