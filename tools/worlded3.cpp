@@ -3337,6 +3337,8 @@ void editactors()
         }
     }
 
+    sprintf(textbuffer, "LEVEL   %d", zones[zonenum].level);
+    printtext_color(textbuffer, 128, texty, SPR_FONTS, COL_WHITE);
     sprintf(textbuffer, "ACTORS  %d/%d/%d", zoneactors, levelactors, allactors);
     printtext_color(textbuffer, 128, texty+15, SPR_FONTS, COL_WHITE);
     sprintf(textbuffer, "OBJECTS %d/%d/%d", zoneobjects, levelobjects, allobjects);
@@ -5236,8 +5238,8 @@ void packcharset(int index)
                                         {
                                             ++charset.cpbblocks;
                                             charset.blockcolors[search] = (blkcol & 0xf) | 0x80; // Color per block = blockcolor with high bit set
-                                            // If block is empty, mark it with an illegal color (no colorwrite), but neighbour blocks with actual color cannot optimize themselves
-                                            if (!sumchardata)
+                                            // If block is empty and multicolor yellow, mark it with an illegal color (no colorwrite), but neighbour blocks with actual color cannot optimize themselves
+                                            if (!sumchardata && blkcol == 0xf)
                                                 charset.blockcolors[search] = 0xff;
                                         }
                                         break;
@@ -5302,8 +5304,6 @@ void packcharset(int index)
                 charset.blockcolors[c] = (charset.blockcolors[c] & 0xf) | 0x40;
             else
                 charset.blockcolors[c] = (charset.blockdata[c] & 0xf) | 0x40;
-            ++charset.optblocks;
-            --charset.cpbblocks;
         }
         else if (charset.optusecount[c] > 0)
         {
@@ -5566,13 +5566,13 @@ bool checkuseoptimize(const ColorBuffer& cbuf, int x, int y, const Zone& zone, b
     int cx = x*2;
     int cy = y*2;
 
-    bool ret = false;
+    bool ret = true;
 
     unsigned char ctl = getcolorfrombuffer(cbuf, cx, cy, 0);
     unsigned char ctr = getcolorfrombuffer(cbuf, cx+1, cy, 0);
     unsigned char cbl = getcolorfrombuffer(cbuf, cx, cy+1, 0);
     unsigned char cbr = getcolorfrombuffer(cbuf, cx+1, cy+1, 0);
-    if (x == zone.sx-1) // At right edge rubbish gets drawn, so cannot optimize
+    if (zone.sx > SCREENSIZEX && x == zone.sx-1) // At right edge rubbish gets drawn, so cannot optimize
         ret = false;
     else if (ctl >= 0x10) // Animating block or already optimized, cannot optimize self
         ret = false;
@@ -5580,18 +5580,26 @@ bool checkuseoptimize(const ColorBuffer& cbuf, int x, int y, const Zone& zone, b
         ret = false;
     else
     {
-        ret = (getcolorfrombuffer(cbuf, cx-1, cy-1, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx+0, cy-1, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx+1, cy-1, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx+2, cy-1, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx-1, cy+2, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx+0, cy+2, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx+1, cy+2, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx+2, cy+2, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx-1, cy+0, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx-1, cy+1, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx+2, cy+0, ctl) == ctl)
-            && (getcolorfrombuffer(cbuf, cx+2, cy+1, ctl) == ctl);
+        ret = true;
+        // If zone doesn't scroll either horizontally or vertically, don't need to consider all directions
+        if (zone.sy > SCREENSIZEY)
+        {
+            ret = ret && (getcolorfrombuffer(cbuf, cx-1, cy-1, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx+0, cy-1, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx+1, cy-1, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx+2, cy-1, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx-1, cy+2, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx+0, cy+2, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx+1, cy+2, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx+2, cy+2, ctl) == ctl);
+        }
+        if (zone.sx > SCREENSIZEX)
+        {
+            ret = ret && (getcolorfrombuffer(cbuf, cx-1, cy+0, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx-1, cy+1, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx+2, cy+0, ctl) == ctl)
+                && (getcolorfrombuffer(cbuf, cx+2, cy+1, ctl) == ctl);
+        }
     }
 
     if (count)
