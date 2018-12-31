@@ -2531,12 +2531,14 @@ void editmap()
             zone.charset--;
             zone.charset &= NUMCHARSETS-1;
             charsetnum = zone.charset;
+            shapeusedirty = true;
         }
         if (key == KEY_TAB && !shiftdown)
         {
             zone.charset++;
             zone.charset &= NUMCHARSETS-1;
             charsetnum = zone.charset;
+            shapeusedirty = true;
         }
         
         if (key == KEY_F)
@@ -2724,12 +2726,14 @@ void editzone()
         zone.charset--;
         zone.charset &= NUMCHARSETS-1;
         charsetnum = zone.charset;
+        shapeusedirty = true;
     }
     if (key == KEY_TAB && !shiftdown)
     {
         zone.charset++;
         zone.charset &= NUMCHARSETS-1;
         charsetnum = zone.charset;
+        shapeusedirty = true;
     }
 
     if (key == KEY_L)
@@ -3816,7 +3820,7 @@ void updateshapeuse()
     for (int c = 0; c < NUMCHARSETS; ++c)
     {
         for (int s = 0; s < NUMSHAPES; ++s)
-            charsets[c].shapes[s].usecount = (s == 0) ? 999 : 0;
+            charsets[c].shapes[s].usecount = 0;
     }
 
     for (int z = 0; z < NUMZONES; ++z)
@@ -3830,6 +3834,13 @@ void updateshapeuse()
             for (int t = 0; t < zone.tiles.size(); ++t)
                 ++charsets[zone.charset].shapes[zone.tiles[t].s].usecount;
         }
+    }
+
+    // Ensure the first shape always shows use
+    for (int c = 0; c < NUMCHARSETS; ++c)
+    {
+        if (!charsets[c].shapes[0].usecount)
+            ++charsets[c].shapes[0].usecount;
     }
 
     shapeusedirty = false;
