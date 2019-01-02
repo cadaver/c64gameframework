@@ -47,6 +47,10 @@ USESCRIPT       = $8000
 
 DrawActors:     stx DA_SprSubXL+1
                 sty DA_SprSubYL+1
+                lda #$4c                        ;Enable sprite draw operation
+                sta DLS_ComplexNoConnect
+                lda #$06
+                sta DLS_SimpleConnectDone
                 ldx cacheFrame
                 stx DSpr_LastCacheFrame+1
 DA_IncCacheFrame:
@@ -72,7 +76,7 @@ DA_Loop:        ldy actT,x
                 sta actLo
                 lda actDataTblHi-1,y
                 sta actHi
-                lda actXL,x                     ;Convert actor coordinates to screen
+                lda actXL,x                     ;Convert actor coordinates to screen + store current position for interpolation
                 sta actPrevXL,x
                 sec
 DA_SprSubXL:    sbc #$00
@@ -129,6 +133,9 @@ DA_LastSprIndex:cpx #MAX_SPR
                 bcc DA_FillSpritesLoop
                 lda numSpr
                 sta DA_LastSprIndex+1           ;Store used sprite count for next frame's cleanup
+                lda #$60                        ;Disable sprite render now
+                sta DLS_ComplexNoConnect
+                sta DLS_SimpleConnectDone
 
         ; Add actors to screen. Also perform line-of-sight check for one actor at a time if requested
         ;
@@ -226,7 +233,7 @@ UpdateActors:   txa                             ;Calculate scrolling change from
                 bcc UA_ScrollXNotNeg
                 ora #$f8
 UA_ScrollXNotNeg:
-                sta UA_ScrollXAdjust+1
+                sta IA_ScrollXAdjust+1
                 tya
                 eor #$ff
                 sec
@@ -239,24 +246,29 @@ UA_ScrollXNotNeg:
                 bcc UA_ScrollYNotNeg
                 ora #$f0
 UA_ScrollYNotNeg:
-                sta UA_ScrollYAdjust+1
-                lda #$60                        ;Modify sprite render code for GetConnectPoint
-                sta DLS_ComplexNoConnect
-                sta DLS_SimpleConnectDone
+                sta IA_ScrollYAdjust+1
                 ldx #MAX_ACT-1
                 stx Irq5_CharAnimFlag+1         ;Enable char animation
                 bne UA_ActorLoop
+
 UA_Skip:        dex
                 bpl UA_ActorLoop
                 jmp UA_ActorsDone
+
 UA_Remove:      jsr RemoveLevelActor            ;Returns with A=0
-                beq UA_CalculateMove            ;Need to calculate interpolation also when removing, to avoid last frame glitches
+                dex
+                bmi UA_ActorsDone
+
 UA_ActorLoop:   ldy actT,x
                 beq UA_Skip
                 stx actIndex
                 lda actFlags,x                  ;Perform remove check?
                 sta currFlags
-                bmi UA_NoRemoveCheck
+                asl
+                bpl UA_AllowInterpolation
+                sta actPrevYH,x                 ;High bit set in prevYH = interpolation disabled
+UA_AllowInterpolation:
+                bcs UA_NoRemoveCheck
                 lda actXH,x
 UA_RemoveLeftCmp:
                 cmp #$00
@@ -279,22 +291,40 @@ UA_NoRemoveCheck:
                 sta actHi
                 ldy #AD_UPDATE+1
 UA_UpdateCall:  jsr ActorCall                   ;Perform the update call
-UA_CalculateMove:
-                bit currFlags
-                bvc UA_CalculateMoveOK
-                lda UA_ScrollXAdjust+1          ;No interpolation: skip average movement calculation,
-                sta actPrevXL,x                 ;use just scrolling offset
-                lda UA_ScrollYAdjust+1
-                bvs UA_StoreYAdjust
-UA_CalculateMoveOK:
-                lda actXL,x                     ;After update, calculate average movement
-                sec                             ;of actor in X-direction
-                sbc actPrevXL,x
-                tay
-                lda actXH,x
-UA_SubPrevXH:   sbc actPrevXH,x
+                dex
+                bpl UA_ActorLoop
+UA_ActorsDone:  stx IA_LastAct+1
+                inx                             ;X=0, fall through to InterpolateActors
+
+        ; Interpolate sprites according to actor & scroll movement
+        ;
+        ; Parameters: -
+        ; Returns: -
+        ; Modifies: A,X,Y,various
+
+InterpolateActors:
+IA_SprLoop:     lda sprC,x                      ;Process flickering
+                cmp #COLOR_FLICKER
+                bcc IA_NoFlicker
+                eor #COLOR_INVISIBLE            ;If sprite is invisible on this frame,
+                sta sprC,x                      ;no need to calculate & add offset
+                bmi IA_Next
+IA_NoFlicker:   and #COLOR_OVERLAY              ;Portrait overlay sprite that shouldn't scroll?
+                bne IA_Next
+                ldy sprAct,x
+IA_LastAct:     cpy #$00
+                beq IA_SameAct
+IA_CalculateMove:
+                sty IA_LastAct+1
+                lda actPrevYH,y                 ;If interpolation disable marked with high bit in prevYH,
+                bmi IA_NoInterpolation          ;use only the scrolling offset
+                lda actXL,y                     ;Calculate average movement of actor in X-direction
+                sbc actPrevXL,y                 ;C=1 from the actor index compare, which is increasing
+                pha
+                lda actXH,y
+                sbc actPrevXH,y
                 sta zpSrcLo
-                tya
+                pla
                 asl
                 lsr zpSrcLo
                 ror
@@ -304,20 +334,20 @@ UA_SubPrevXH:   sbc actPrevXH,x
                 lsr
                 lsr
                 bit zpSrcLo                     ;Sign is now in bit 6
-                bvc UA_XMovePos
+                bvc IA_XMovePos
                 ora #$f8
-UA_XMovePos:
-UA_ScrollXAdjust:
+IA_XMovePos:
+IA_ScrollXAdjust:
                 adc #$00                        ;Add scrolling
-                sta actPrevXL,x                 ;Store offset for sprite movement
-                lda actYL,x                     ;Calculate average movement
-                sec                             ;of actor in Y-direction
-                sbc actPrevYL,x                 ;(max. 31 pixels)
-                tay
-                lda actYH,x
-UA_SubPrevYH:   sbc actPrevYH,x
+                sta zpDestLo                    ;Store offset for sprite movement
+                lda actYL,y                     ;Calculate average movement of actor in Y-direction
+                sec                             ;(max. 31 pixels)
+                sbc actPrevYL,y
+                pha
+                lda actYH,y
+                sbc actPrevYH,y
                 sta zpSrcLo
-                tya
+                pla
                 asl
                 lsr zpSrcLo
                 ror
@@ -326,49 +356,32 @@ UA_SubPrevYH:   sbc actPrevYH,x
                 lsr
                 lsr
                 bit zpSrcLo
-                bvc UA_YMovePos
+                bvc IA_YMovePos
                 ora #$f0
-UA_YMovePos:
-UA_ScrollYAdjust:
+IA_YMovePos:
+IA_ScrollYAdjust:
                 adc #$00                        ;Add scrolling + LSB
-UA_StoreYAdjust:sta actPrevYL,x
-                dex
-                bmi UA_ActorsDone
-                jmp UA_ActorLoop
-UA_ActorsDone:  lda #$4c                        ;Restore sprite draw operation
-                sta DLS_ComplexNoConnect
-                lda #$06
-                sta DLS_SimpleConnectDone
-
-        ; Interpolate sprites according to actor & scroll movement
-        ;
-        ; Parameters: -
-        ; Returns: -
-        ; Modifies: A,X,Y,various
-
-InterpolateActors:
-                ldx numSpr
-                dex
-                bmi IA_Done
-IA_SprLoop:     lda sprC,x                      ;Process flickering
-                cmp #COLOR_FLICKER
-                bcc IA_NoFlicker
-                eor #COLOR_INVISIBLE            ;If sprite is invisible on this frame,
-                sta sprC,x                      ;no need to calculate & add offset
-                bmi IA_Next
-IA_NoFlicker:   and #COLOR_OVERLAY              ;Overlay sprite that shouldn't scroll?
-                bne IA_Next
-                ldy sprAct,x                    ;Now add the calculated interpolation offsets
+IA_StoreYAdjust:sta zpDestHi
+IA_SameAct:     lda sprX,x                      ;Now add the calculated interpolation offsets
+                clc
+                adc zpDestLo
+                sta sprX,x
                 lda sprY,x
                 clc
-                adc actPrevYL,y
+                adc zpDestHi
                 sta sprY,x
-                lda sprX,x
-                clc
-                adc actPrevXL,y
-                sta sprX,x
-IA_Next:        dex
-                bpl IA_SprLoop
+IA_Next:        inx
+                cpx numSpr
+                bcc IA_SprLoop
+                bcs IA_Done
+
+IA_NoInterpolation:
+                lda #$ff
+                lda IA_ScrollXAdjust+1          ;No interpolation: skip average movement calculation,
+                sta zpDestLo                    ;use just scrolling offset
+                lda IA_ScrollYAdjust+1
+                bcs IA_StoreYAdjust
+
 IA_Done:
 
         ; Scan levelobject at player
@@ -736,15 +749,14 @@ ResetSpeed:     lda #MB_GROUNDED
                 sta actSY,x
                 rts
 
-        ; Disable movement interpolation for the current frame. To be called during actor's own update.
+        ; Disable movement interpolation for the current frame.
         ;
         ; Parameters: X actor index
-        ; Returns: Z=0
+        ; Returns: A=$ff
         ; Modifies: A
 
-NoInterpolation:lda currFlags
-                ora #AF_NOINTERPOLATION
-                sta currFlags
+NoInterpolation:lda #$ff
+                sta actPrevYH,x
                 rts
 
         ; Add actor from leveldata
@@ -1201,12 +1213,9 @@ SWO_YNotOver:   sta actYL,y
                 lda actYH,x
                 adc yHi
                 sta actYH,y
-                lda UA_ScrollXAdjust+1          ;In case the old actor still exists as sprites, apply only scroll adjust to it
-                sta actPrevXL,y
-                lda UA_ScrollYAdjust+1
-                sta actPrevYL,y
-                lda #ORG_NONPERSISTENT
-                sta actLvlDataOrg,y             ;Spawned actors are by default not persisted
+                lda #ORG_NONPERSISTENT          ;Spawned actors are by default not persisted
+                sta actLvlDataOrg,y
+                sta actPrevYH,y                 ;Disable interpolation in case the same actor slot was occupied during previous DrawActors
                 txa
                 sta actOrg,y                    ;Store spawning actor index
                 rts
