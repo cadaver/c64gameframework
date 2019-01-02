@@ -308,7 +308,7 @@ UA_SubPrevXH:   sbc actPrevXH,x
                 ora #$f8
 UA_XMovePos:
 UA_ScrollXAdjust:
-                adc #$00                        ;Add scrolling + LSB
+                adc #$00                        ;Add scrolling
                 sta actPrevXL,x                 ;Store offset for sprite movement
                 lda actYL,x                     ;Calculate average movement
                 sec                             ;of actor in Y-direction
