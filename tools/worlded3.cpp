@@ -5451,22 +5451,57 @@ void drawzonetobuffer(ColorBuffer& cbuf, const Zone& zone)
     for (int t = 0; t < zone.tiles.size(); ++t)
         drawshapebuffer(cbuf, zone.tiles[t].x, zone.tiles[t].y, zone.tiles[t].s, zone);
 
-    // Mark animating levelobjects illegal for the color optimization
+    // Mark animating levelobjects illegal for the color optimization, if the subsequent frames change color
     for (int c = 0; c < NUMLVLOBJ; ++c)
     {
         if (objects[c].sx && objects[c].sy && objects[c].frames > 1)
         {
-            int z2 = findzone(objects[c].x, objects[c].y);
+            const Object& obj = objects[c];
+            int z2 = findzone(obj.x, obj.y);
             if (&zones[z2] == &zone)
             {
-                for (int oy = objects[c].y - zone.y; oy < objects[c].y + objects[c].sy - zone.y; ++oy)
+                std::vector<unsigned char> origcolors;
+                std::vector<unsigned char> mismatch;
+
+                for (int oy = (obj.y - zone.y)*2; oy < (obj.y + obj.sy - zone.y)*2; ++oy)
                 {
-                    for (int ox = objects[c].x - zone.x; ox < objects[c].x + objects[c].sx - zone.x; ++ox)
+                    for (int ox = (obj.x - zone.x)*2; ox < (obj.x + obj.sx - zone.x)*2; ++ox)
                     {
-                        cbuf.charcolors[(oy*2)*zone.sx*2+ox*2] |= 0x10;
-                        cbuf.charcolors[(oy*2)*zone.sx*2+ox*2+1] |= 0x10;
-                        cbuf.charcolors[(oy*2+1)*zone.sx*2+ox*2] |= 0x10;
-                        cbuf.charcolors[(oy*2+1)*zone.sx*2+ox*2+1] |= 0x10;
+                        origcolors.push_back(cbuf.charcolors[oy*zone.sx*2+ox]);
+                        mismatch.push_back(0);
+                    }
+                }
+
+                int t = findobjectshape(obj.x, obj.y, zone);
+                int cidx;
+                for (int s = t + 1; s < t + obj.frames && s < NUMSHAPES; ++s)
+                {
+                    drawshapebuffer(cbuf, obj.x-zone.x, obj.y-zone.y, s, zone);
+                    cidx = 0;
+                    for (int oy = (obj.y - zone.y)*2; oy < (obj.y + obj.sy - zone.y)*2; ++oy)
+                    {
+                        for (int ox = (obj.x - zone.x)*2; ox < (obj.x + obj.sx - zone.x)*2; ++ox)
+                        {
+                            if (origcolors[cidx] != cbuf.charcolors[oy*zone.sx*2+ox])
+                                mismatch[cidx] |= 0x10;
+                            ++cidx;
+                        }
+                    }
+                }
+                
+                // Draw the original frame back  before marking mismatches
+                drawshapebuffer(cbuf, obj.x-zone.x, obj.y-zone.y, t, zone);
+
+                cidx = 0;
+                for (int oy = (obj.y - zone.y)*2; oy < (obj.y + obj.sy - zone.y)*2; ++oy)
+                {
+                    for (int ox = (obj.x - zone.x)*2; ox < (obj.x + obj.sx - zone.x)*2; ++ox)
+                    {
+                        cbuf.charcolors[oy*zone.sx*2+ox] |= mismatch[cidx];
+                        // Mark the insides always non-optimizing
+                        if (oy != (obj.y-zone.y)*2 && oy != (obj.y+obj.sy-zone.y)*2-1 && ox != (obj.x-zone.x)*2 && ox != (obj.x+obj.sx-zone.x)*2-1)
+                            cbuf.charcolors[oy*zone.sx*2+ox] |= 0x10;
+                        ++cidx;
                     }
                 }
             }
