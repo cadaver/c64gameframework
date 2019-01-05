@@ -63,11 +63,9 @@ gb_skip:
         bvs gb_get_hi
         rts
 gb_get_hi:
-        sec
         sta zpBitsHi
-        php
         jsr GetByte
-        plp
+        sec
 DepackError:
         rts
 
@@ -171,7 +169,7 @@ no_hi_incr:
 ; x must be #0 when entering and contains the length index + 1
 ; when exiting or 0 for literal byte
 next_round:
-        ldx #$ff
+        dex
         lda zpBitBuf
 no_literal1:
         asl
@@ -313,9 +311,8 @@ copy_next_hi:
     endif
     if LITERAL_SEQUENCES_NOT_USED = 0
 get_literal_byte:
-        php
         jsr GetByte
-        plp
+        sec
         bcs literal_byte_gotten
     endif
 ; -------------------------------------------------------------------
