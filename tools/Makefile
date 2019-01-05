@@ -1,4 +1,4 @@
-all: worlded3.exe spred3.exe gt2mini.exe usecount.exe makeef.exe makegmod2.exe pack2.exe pchunk2.exe maked64.exe symbols.exe filejoin.exe filesplit.exe bmeconv.exe datafile.exe dat2inc.exe gfxconv.exe
+all: worlded3.exe spred3.exe gt2mini.exe usecount.exe makeef.exe makegmod2.exe pack3.exe pchunk3.exe maked64.exe symbols.exe filejoin.exe filesplit.exe bmeconv.exe datafile.exe dat2inc.exe gfxconv.exe
 
 clean:
 	del *.exe
@@ -39,11 +39,11 @@ makegmod2.exe: makegmod2.cpp
 	g++ makegmod2.cpp -omakegmod2.exe -w -march=i386 -static-libstdc++ -static-libgcc -lmingw32 -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic
 	strip makegmod2.exe
 
-pack2.exe: pack2.c
-	gcc pack2.c -opack2.exe
+pack3.exe: pack3.c
+	gcc pack3.c -opack3.exe
 
-pchunk2.exe: pchunk2.c
-	gcc pchunk2.c -opchunk2.exe
+pchunk3.exe: pchunk3.c
+	gcc pchunk3.c -opchunk3.exe
 
 maked64.exe: maked64.c
 	gcc maked64.c -omaked64.exe

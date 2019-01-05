@@ -2,7 +2,6 @@
                 include loadsym.s
                 include mainsymcart.s
 
-EXOMIZER_ERRORHANDLING = 0
 KILLKEY         = 1                         ;Left arrow
 
 FIRSTSAVEFILE   = $78
@@ -11,7 +10,6 @@ SAVEDIRSIZE     = $20
 saveDirectory   = $0100
 CrtLoader       = $0200
 irqVectors      = $0314
-Startup         = $0500
 fileStartLo     = $9e00
 fileStartHi     = $9e80
 fileSizeLo      = $9f00
@@ -91,7 +89,7 @@ EEPROM_DATAIN   = $10
 
 ; copy of the value stored into the cartridge register
 GMOD2REG_SHADOW         = zpLenLo              ;This and rest of the ZP loader vars are not to be modified during savefile access
-eeprom_data_temp        = loadTempReg
+eeprom_data_temp        = loadBufferPos
 
 ;------------------------------------------------------------
 eeprom_reset:
@@ -321,7 +319,7 @@ InitSaveLoop:   lda saveHelperCodeStart-1,x
                 stx GB_EndCmp+1
                 jmp ReadSaveDirectory
 
-irqVectorsEnd:  ds.b LoadFile-irqVectorsEnd,$ff
+irqVectorsEnd:  ds.b exomizerCodeStart-irqVectorsEnd,$ff
 
                 include exomizer.s
 
@@ -330,15 +328,17 @@ exomizerCodeEnd:ds.b OpenFile-exomizerCodeEnd,$ff
                 jmp OpenFileGMOD2
                 jmp SaveFileGMOD2
 
-GetByte:        ldx #$37
+GetByte:        stx loadTempReg
+                ldx #$37
                 stx $01
-GetByteFast:    ldx loadBufferPos
+                ldx loadBufferPos
 GB_SectorLda:   lda $8000,x
 GB_EndCmp:      cpx #$00
                 bcs GB_FillBuffer
                 inc loadBufferPos
 Restore01:      ldx #$35
                 stx $01
+                ldx loadTempReg
 OpenFileSkip:   rts
 
 GB_FillBuffer:  ldx fileOpen
@@ -347,7 +347,7 @@ GB_FillBuffer:  ldx fileOpen
                 cpx #$ff
                 bne GB_FillBufferOK
 GB_CloseFile:   dec fileOpen                    ;Last byte was read, mark file closed
-                clc
+GB_ClcRestore01:clc
                 bcc Restore01
 GB_FillBufferOK:ldx GB_SectorLda+2
                 inx
@@ -395,11 +395,11 @@ OF_SaveFile:    jsr InitSave                    ;Copy EEPROM helper code + read 
                 lda saveDirectory+3,y
                 sta zpBitsHi
                 lda #$4c                        ;Replace GetByte with jump to implementation
-                sta GetByte
-                lda #<SaveGetByteImpl
-                sta GetByte+1
-                lda #>SaveGetByteImpl
                 sta GetByte+2
+                lda #<SaveGetByteImpl
+                sta GetByte+3
+                lda #>SaveGetByteImpl
+                sta GetByte+4
                 ldy eepromPosLo
                 ldx eepromPosHi
                 jsr eeprom_reset_and_read_begin
@@ -431,8 +431,6 @@ crtLoaderRuntimeEnd:
                 if crtLoaderRuntimeEnd > ntscFlag
                     err
                 endif
-
-                ds.b Startup-crtLoaderRuntimeEnd,$ff
 
 Startup:        jsr $ff84   ; Initialise I/O
                 ldx #$00
@@ -570,23 +568,22 @@ SGBI_NoMSB:     dec zpBitsLo
                 ora zpBitsHi
                 bne SGBI_NoEOF
                 lda #$a2                        ;Restore original GetByte operation
-                sta GetByte
-                lda #$37
-                sta GetByte+1
-                lda #$86
                 sta GetByte+2
+                lda #$37
+                sta GetByte+3
+                lda #$86
+                sta GetByte+4
                 jsr eeprom_read_end
                 pla
                 jmp GB_CloseFile
 SGBI_NoEOF:     pla
-                clc
-                rts
+                jmp GB_ClcRestore01
 
                 rend
 
 saveHelperCodeEnd:
 
-                if saveHelperCodeEnd - saveHelperCodeStart > $a8
+                if saveHelperCodeEnd - saveHelperCodeStart > $b0
                     err
                 endif
 

@@ -180,17 +180,14 @@ CL_NoAutoDeact: jsr RemoveLevelActors
                 sta zoneBufferLo                ;loading
                 lda musicDataHi
                 sta zoneBufferHi
-CL_Retry:       ldy #C_LEVEL
+                ldy #C_LEVEL
                 sty loadRes
                 jsr PurgeFile                   ;Remove the old level
                 jsr LF_CustomFileName           ;This part will be automatically retried on error
                 lda #<lvlObjX                   ;After the map data, load the object / actor definitions (compressed normally)
                 ldx #>lvlObjX
                 jsr LoadFile
-                bcc CL_NewLevelOK
-                jsr RetryPrompt                 ;Needs to be retried manually
-                bcs CL_Retry
-CL_NewLevelOK:  ldy levelNum
+                ldy levelNum
                 lda lvlActBitStart,y
                 sta zpSrcLo
                 ldx #MAX_LVLACT-1
@@ -269,12 +266,9 @@ CZ_LoadedCharset:
                 sta CZ_LoadedCharset+1
                 ldx #F_CHARSET
                 jsr MakeFileName
-CZ_RetryCharset:lda #<blkTL
+                lda #<blkTL
                 ldx #>blkTL
                 jsr LoadFile
-                bcc CZ_SameCharset
-                jsr RetryPrompt
-                bcs CZ_RetryCharset
 CZ_SameCharset: jsr GetZoneObject
                 ldy #ZONEH_SIZEX
                 lda (zpSrcLo),y

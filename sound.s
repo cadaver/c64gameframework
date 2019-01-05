@@ -163,12 +163,9 @@ PrS_FadeWait:   lda masterVol
                 bne PrS_FadeWait
 PrS_NoFadeWait: lda #$ff
                 sta PlayRoutine+1               ;Silence during loading
-                bne PrS_Retry
-PrS_Error:      jsr RetryPrompt
-PrS_Retry:      jsr OpenFile                    ;Music files are raw Exomizer2 output,
+                jsr OpenFile                    ;Music files are Exomizer level mode output,
                 jsr GetByte                     ;meaning they start with startaddress hi/lo
-                bcs PrS_Error
-PrS_NoError:    sta musicDataHi                 ;Reset zonebuffer ptr. now
+                sta musicDataHi                 ;Reset zonebuffer ptr. now
                 sta zoneBufferHi
                 jsr GetByte
                 sta musicDataLo
@@ -176,12 +173,12 @@ PrS_NoError:    sta musicDataHi                 ;Reset zonebuffer ptr. now
                 jsr PurgeUntilFreeNoNew         ;Purge files if necessary to fit the music
                 lda musicDataLo
                 ldx musicDataHi
-                jsr LoadFile
-                bcs PrS_Error                   ;Fall through to SetMusicData if no error
+                jsr LoadFile                    ;Load the actual music data
 
-        ; Set music data address. C must be 0
+        ; Set music data address.
 
-SetMusicData:   lda musicDataLo
+SetMusicData:   clc
+                lda musicDataLo
                 adc #MUSICHEADERSIZE
                 sta trackPtrLo
                 lda musicDataHi

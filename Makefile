@@ -26,7 +26,7 @@ loader.prg: kernal.s loader.s ldepack.s exomizer.s macros.s memory.s loadsym.txt
 	symbols ldepack.tbl ldepacksym.s ldepacksym.txt
 	dasm loader.s -oloader.bin -sloader.tbl -f3
 	symbols loader.tbl loadsym.s loadsym.txt
-	pack2 loader.bin loader.pak
+	pack3 loader.bin loader.pak
 	dasm ldepack.s -oloader.prg -sldepack.tbl -f3
 	symbols ldepack.tbl ldepacksym.s ldepacksym.txt
 
@@ -40,31 +40,31 @@ main.pak: loadsym.s ldepacksym.s memory.s defines.s main.s init.s input.s file.s
 	dasm main.s -omain.bin -smain.tbl -f3
 	symbols main.tbl mainsym.s
 	symbols main.tbl mainsymcart.s mainsymcart.txt
-	pack2 main.bin main.pak
+	pack3 main.bin main.pak
 
 music00.pak: music/example.sng
 	gt2mini music/example.sng music00.s -ed000
 	dasm music00.s -omusic00.prg -p3
-	exomizer208 level -M255 -c -f -omusic00.pak music00.prg
+	exomizer3 level -M256 -c -f -omusic00.pak music00.prg
 
 level00.pak: bg/world00.map bg/world00.lvo bg/world00.lva level00.s
 	dasm level00.s -olevel00.bin -f3
-	pack2 level00.bin level00data.pak
+	pack3 level00.bin level00data.pak
 	filejoin bg/world00.map+level00data.pak level00.pak
 
 charset00.pak: charset00.s mainsym.s memory.s bg/world00.blk bg/world00.bli bg/world00.chr bg/world00.oba
 	dasm charset00.s -ocharset00.bin -f3
-	pack2 charset00.bin charset00.pak
+	pack3 charset00.bin charset00.pak
 
 sprcommon.pak: spr/common.spr.res
-	pchunk2 spr/common.spr.res sprcommon.pak
+	pchunk3 spr/common.spr.res sprcommon.pak
 
 sprplayer.pak: spr/player.spr.res
-	pchunk2 spr/player.spr.res sprplayer.pak
+	pchunk3 spr/player.spr.res sprplayer.pak
 
 sprenemy.pak: spr/enemy.spr.res
-	pchunk2 spr/enemy.spr.res sprenemy.pak
+	pchunk3 spr/enemy.spr.res sprenemy.pak
 
 script00.pak: script00.s mainsym.s macros.s memory.s
 	dasm script00.s -oscript00.bin -f3
-	pchunk2 script00.bin script00.pak
+	pchunk3 script00.bin script00.pak

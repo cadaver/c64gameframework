@@ -13,21 +13,8 @@ MakeFileName_Direct:
                 sta fileNumber
 LF_NoError:     rts
 
-        ; Retry prompt for load error
-        ;
-        ; Parameters: -
-        ; Returns: C=1
-        ; Modifies: A,X,Y
-
-RetryPrompt:    lda #<txtIOError
-                ldx #>txtIOError
-                jsr PrintPanelTextIndefinite
-RP_WaitFire:    jsr GetControls
-                bcc RP_WaitFire
-                jmp ClearPanelText
-
         ; Allocate & load a resource file, and return address of object from inside.
-        ; If no memory, purge unused files. Will retry on error
+        ; If no memory, purge unused files.
         ;
         ; Parameters: A object number, Y chunk file number (or X script number for GetScriptResource)
         ; Returns: loadRes chunk file number, zpDestLo-Hi file address, zpSrcLo-Hi object address (hi also in A)
@@ -79,9 +66,8 @@ LF_AgeLoop:     ldy fileHi,x
 LF_AgeSkip:     inx
                 cpx #MAX_CHUNKFILES
                 bcc LF_AgeLoop
-LF_Retry:       jsr OpenFile
-                jsr GetByte                     ;Get datasize lowbyte, check error
-                bcs LF_Error
+                jsr OpenFile
+                jsr GetByte                     ;Get datasize lowbyte
                 sta dataSizeLo
                 jsr GetByte                     ;Get datasize highbyte
                 sta dataSizeHi
@@ -103,7 +89,6 @@ LF_Uncompressed:sta zpDestLo
                 beq LF_UncompressedPredecrement
 LF_UncompressedLoop:
                 jsr GetByte
-                bcs LF_Error
 LF_UncompressedStore:
                 sta (zpDestLo),y
                 iny
@@ -118,9 +103,6 @@ LF_UncompressedPredecrement:
                 bmi LF_UncompressedDone
 
 LF_IsCompressed:jsr LoadFile
-                bcc LF_UncompressedDone
-LF_Error:       jsr RetryPrompt
-                bcs LF_Retry
 
         ; Finish loading, relocate chunk object pointers
 

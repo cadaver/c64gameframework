@@ -4911,16 +4911,15 @@ std::vector<unsigned char> exomize(unsigned char* data, int datasize)
     write(exosrchandle, data, datasize);
     close(exosrchandle);
 
-    system("exomizer208 level -M255 -c -f -otemp.pak temp.bin@0");
+    system("exomizer3 raw -M256 -c -otemp.pak temp.bin");
     exodesthandle = open("temp.pak", O_RDONLY|O_BINARY, S_IREAD);
 
     std::vector<unsigned char> ret;
 
     if (exodesthandle != -1)
     {
-        // Skip first 2 bytes of packed output (dest.address)
-        int packedsize = lseek(exodesthandle, 0, SEEK_END) - 2;
-        lseek(exodesthandle, 2, SEEK_SET);
+        int packedsize = lseek(exodesthandle, 0, SEEK_END);
+        lseek(exodesthandle, 0, SEEK_SET);
         ret.resize(packedsize);
         if (packedsize > 0)
             read(exodesthandle, &ret[0], packedsize);

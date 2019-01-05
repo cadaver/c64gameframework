@@ -2,8 +2,6 @@
                 include loadsym.s
                 include mainsymcart.s
 
-EXOMIZER_ERRORHANDLING = 0                      ;Not needed, speed up loading
-
 EASYFLASH_LED   = $80
 EASYFLASH_16K   = $07
 EASYFLASH_KILL  = $04
@@ -13,7 +11,6 @@ MAXSAVEFILES    = 8
 MAXSAVEPAGES    = 8                             ;How much the savefiles can take RAM in total (during preserve & erase)
 
 CrtLoader       = $0200
-Startup         = $0500
 irqVectors      = $0314
 fileStartLo     = $8000
 fileStartHi     = $8080
@@ -74,11 +71,11 @@ SavePreserveFiles:
                 sta zpBitsHi                    ;Current file length
                 cpx saveFileNumber
                 beq SavePreserveFileEnd         ;Do not preserve the file we'll overwrite now
-                jsr OpenFile
                 lda zpDestLo
                 sta saveFileAdrLo-FIRSTSAVEFILE,x
                 lda zpDestHi
                 sta saveFileAdrHi-FIRSTSAVEFILE,x
+                jsr OpenFile
                 ldy #$00
 SavePreserveFileLoop:
                 jsr GetByte
@@ -278,7 +275,7 @@ irqVectors:     dc.w NMI
                 dc.w NMI
                 dc.w NMI
 
-irqVectorsEnd:  ds.b LoadFile-irqVectorsEnd,$ff
+irqVectorsEnd:  ds.b exomizerCodeStart-irqVectorsEnd,$ff
 
                 include exomizer.s
 
@@ -286,7 +283,8 @@ exomizerCodeEnd:ds.b OpenFile-exomizerCodeEnd,$ff
 
                 jmp OpenFileEF
                 jmp SaveFileEF
-GetByte:        ldx #$37
+GetByte:        stx loadTempReg
+                ldx #$37
                 stx $01
                 ldx loadBufferPos
 GB_SectorLda:   lda $8000,x
@@ -295,6 +293,7 @@ GB_EndCmp:      cpx #$00
                 inc loadBufferPos
 Restore01:      ldx #$35
                 stx $01
+                ldx loadTempReg
 OpenFileSkip:   rts
 
 GB_FillBuffer:  ldx fileOpen
@@ -387,8 +386,6 @@ crtLoaderRuntimeEnd:
                 if crtLoaderRuntimeEnd > ntscFlag
                     err
                 endif
-
-                ds.b Startup-crtLoaderRuntimeEnd,$ff
 
 Startup:        lda #EASYFLASH_16K + EASYFLASH_LED
                 sta $de02

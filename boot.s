@@ -67,18 +67,25 @@ ShowMessage:    lda #$0f
                 sta $2000+12*40+1,y
                 dey
                 bne ShowMessage
-LoadExomizer:   jsr ChrIn                       ;Load the unpacked Exomizer
-                sta exomizerCodeStart,y
-                iny
-                cpy #packedLoaderStart-exomizerCodeStart
-                bcc LoadExomizer
-                lda #>(InitLoader-1)            ;Push loader entrypoint to stack
+LoadExomizer:   jsr ChrIn                       ;Load Exomizer (unpacked)
+LoadExomizerSta:sta exomizerCodeStart
+                inc LoadExomizerSta+1
+                bne LoadExomizerNoMSB
+                inc LoadExomizerSta+2
+LoadExomizerNoMSB:
+                lda LoadExomizerSta+1
+                cmp #<packedLoaderStart
+                bne LoadExomizer
+                lda LoadExomizerSta+2
+                cmp #>packedLoaderStart
+                bne LoadExomizer
+                lda #>(InitLoader-1)            ;Load loader (packed), then run it
                 pha
                 lda #<(InitLoader-1)
                 pha
                 lda #<loaderCodeStart
                 ldx #>loaderCodeStart
-                jmp LoadFile                    ;Use Exomizer to load the packed loader
+                jmp LoadFile
 BootNMI:        rti
 
 message:        dc.b "HOLD SPACE/FIRE FOR SAFE MODE "

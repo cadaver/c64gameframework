@@ -12,8 +12,6 @@ LOAD_FAST       = $ff           ;(or any other negative value) Load using custom
 
 MW_LENGTH       = 32            ;Bytes in one M-W command
 
-RETRIES         = 10            ;Retries when reading a sector
-
 tablBi          = depackBuffer
 tablLo          = depackBuffer + 52
 tablHi          = depackBuffer + 104
@@ -187,27 +185,30 @@ ilSlowLoadStart:
         ; $00 - EOF (no error)
         ; $02 - File not found
         ; $80 - Device not present
-        ; Modifies: A,X
+        ; Modifies: A
 
 SlowGetByte:    lda fileOpen
                 beq SGB_Closed
                 sta $01
                 jsr ChrIn
-                ldx status
+                pha
+                lda status
                 bne SGB_EOF
                 dec $01
-SGB_LastByte:   clc
+SGB_LastByte:   pla
+                clc
 SO_Done:        rts
-SGB_EOF:        pha
-                txa
-                and #$83
+SGB_EOF:        and #$83
                 sta SGB_Closed+1
+                php
+                stx loadTempReg
                 sty loadBufferPos
                 jsr CloseKernalFile
+                ldx loadTempReg
                 ldy loadBufferPos
-                pla
-                ldx SGB_Closed+1
+                plp
                 beq SGB_LastByte
+                pla
 SGB_Closed:     lda #$00
                 sec
                 rts
@@ -344,16 +345,18 @@ ilFastLoadStart:
         ; $00 - EOF (no error)
         ; $02 - File not found
         ; $80 - Device not present
-        ; Modifies: A,X
+        ; Modifies: A
 
-GetByte:        ldx loadBufferPos
+GetByte:        stx loadTempReg
+                ldx loadBufferPos
                 lda loadBuffer,x
 GB_EndCmp:      cpx #$00
                 bcs FL_FillBuffer
                 inc loadBufferPos
-SetSpriteRangeDummy:
+GB_FileEnd:     ldx loadTempReg
 FO_Done:
-GB_FileEnd:     rts
+SetSpriteRangeDummy:
+                rts
 
 FastOpen:       lda fileOpen                    ;A file already open? If so, do nothing
                 bne FO_Done                     ;(allows chaining of files)
@@ -414,10 +417,10 @@ FL_NextByte:    bne FL_FillBufferLoop
                 ldx #$02
 FL_PartialBuffer:
 FL_FullBuffer:  stx GB_EndCmp+1
+                pla                             ;Restore A
                 ldx #$02
                 stx loadBufferPos               ;Set buffer read position
-                pla                             ;Restore A
-                rts
+                bne GB_FileEnd                  ;Restore X & return
 
 FL_SendCmdAndFileName:
                 ora fileNumber
@@ -629,7 +632,6 @@ DrvEndMark:     stx drvBuf+2                    ;Send endmark, return code in X
 
 DrvFound:
 DrvSectorLoop:  jsr DrvReadSector               ;Read the data sector
-                bcs DrvEndMark
 DrvSendBlk:
 Drv2MHzSend:    lda drvBuf
                 ldx #$00                        ;Set DATA=high to mark data available
@@ -732,7 +734,6 @@ DrvSave:        and #$7f                        ;Extract filenumber
 DrvSaveFound:   lda drvFileSct,y
 DrvSaveSectorLoop:
                 jsr DrvReadSector               ;First read the sector for T/S chain
-                bcs DrvSaveFinish               ;Abort on error
                 ldx #$02
 DrvSaveByteLoop:jsr DrvGetSaveByte              ;Then get bytes from C64 and write
                 bcs DrvSaveSector               ;If last byte, save the last sector
@@ -756,15 +757,11 @@ DrvReadSct:     sta $1000
                 lda #$80
 DrvDoJob:       sta DrvRetry+1
                 jsr DrvLed
-                ldy #RETRIES
 DrvRetry:       lda #$80
                 ldx #$01
 DrvExecJsr:     jsr Drv1541Exec                 ;Exec buffer 1 job
                 cmp #$02                        ;Error?
-                bcc DrvSuccess
-                dey
-                bne DrvRetry                    ;Retry until count exhausted
-DrvFail:        ldx #$01                        ;Return code $01: read error
+                bcs DrvRetry                    ;Retry infinitely until success
 DrvSuccess:     sei                             ;Make sure interrupts now disabled
 DrvLed:         lda #$08
 DrvLedAcc0:     eor $1c00
@@ -802,7 +799,6 @@ DrvClearFiles:  sta drvFileTrk,x                ;Mark all files as nonexistent f
 DrvDirTrk:      ldx drv1541DirTrk
 DrvDirSct:      lda drv1541DirSct               ;Read disk directory
 DrvDirLoop:     jsr DrvReadSector               ;Read sector
-                bcs DrvDirCached                ;Abort if failed to read
                 ldy #$02
 DrvNextFile:    lda drvBuf,y                    ;File type must be PRG
                 and #$83

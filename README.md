@@ -17,7 +17,7 @@ Features:
 - Optional reduction of scroll area to 21 rows on unaccelerated NTSC machines, due to less available CPU cycles per frame
 - Loader based on the CovertBitops Loader V2.24 (1541/1581/FD/HD/IDE64)
 - EasyFlash & GMod2 mastering and save support
-- Exomizer2 compression
+- Exomizer3 compression
 
 Documentation and use example will be improved as an ongoing project.
 

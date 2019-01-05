@@ -15,5 +15,3 @@ saveMiscVarHi:  dc.b >actT
                 dc.b >zoneNum
 
 NUM_SAVEMISCVARS = saveMiscVarHi - saveMiscVarLo
-
-txtIOError:     dc.b "I/O ERROR, FIRE TO RETRY",0

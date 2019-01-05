@@ -9,7 +9,7 @@
                 var loadBufferPos
                 var fileOpen
 
-                var zpLenLo                     ;Exomizer 2 depackroutine variables
+                var zpLenLo                     ;Exomizer 3 depackroutine variables
                 var zpSrcLo
                 var zpSrcHi
                 var zpDestLo
@@ -17,6 +17,8 @@
                 var zpBitsLo
                 var zpBitsHi
                 var zpBitBuf
+
+zpLenHi         = zpBitsLo                      ;Exomizer 3 doesn't use zpBitsLo, but the engine uses it as an extra pointer / counter
 
                 var xLo                         ;Actor render / spawn coordinates
                 var yLo
