@@ -4911,7 +4911,7 @@ std::vector<unsigned char> exomize(unsigned char* data, int datasize)
     write(exosrchandle, data, datasize);
     close(exosrchandle);
 
-    system("exomizer3 raw -M256 -c -otemp.pak temp.bin");
+    system("exomizer3 raw -T4 -M256 -c -otemp.pak temp.bin");
     exodesthandle = open("temp.pak", O_RDONLY|O_BINARY, S_IREAD);
 
     std::vector<unsigned char> ret;
