@@ -95,7 +95,6 @@ Depack:
 ; calculate tables (62 bytes) + get_bits macro
 ; x and y must be #0 when entering
 ;
-        clc
 table_gen:
         tax
         tya
