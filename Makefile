@@ -33,8 +33,8 @@ loader.prg: kernal.s loader.s ldepack.s exomizer.s macros.s memory.s loadsym.txt
 boot.prg: boot.s loader.prg
 	dasm boot.s -oboot.prg
 
-main.pak: loadsym.s ldepacksym.s memory.s defines.s main.s init.s input.s file.s screen.s raster.s level.s ai.s \
-	panel.s actor.s sprite.s physics.s sound.s \
+main.pak: loadsym.s ldepacksym.s memory.s defines.s main.s init.s input.s file.s screen.s raster.s math.s sound.s \
+	panel.s actor.s sprite.s physics.s level.s ai.s \
 	actordata.s sounddata.s aligneddata.s playroutinedata.s \
 	bg/worldinfo.s bg/scorescr.chr
 	dasm main.s -omain.bin -smain.tbl -f3
