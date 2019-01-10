@@ -187,14 +187,14 @@ typedef std::pair<unsigned, unsigned char> BlockKey;
 typedef std::pair<int, int> CoordKey;
 
 unsigned char slopetbl[] = {
-  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  // Slope 0
-  0x78,0x70,0x68,0x60,0x58,0x50,0x48,0x40,0x38,0x30,0x28,0x20,0x18,0x10,0x08,0x00,  // Slope 1
-  0x38,0x38,0x30,0x30,0x28,0x28,0x20,0x20,0x18,0x18,0x10,0x10,0x08,0x08,0x00,0x00,  // Slope 2
-  0x78,0x78,0x70,0x70,0x68,0x68,0x60,0x60,0x58,0x58,0x50,0x50,0x48,0x48,0x40,0x40,  // Slope 3
-  0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,  // Slope 4
-  0x00,0x08,0x10,0x18,0x20,0x28,0x30,0x38,0x40,0x48,0x50,0x58,0x60,0x68,0x70,0x78,  // Slope 5
-  0x00,0x00,0x08,0x08,0x10,0x10,0x18,0x18,0x20,0x20,0x28,0x28,0x30,0x30,0x38,0x38,  // Slope 6
-  0x40,0x40,0x48,0x48,0x50,0x50,0x58,0x58,0x60,0x60,0x68,0x68,0x70,0x70,0x78,0x78,  // Slope 7
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  // Slope 0
+    0x78,0x70,0x68,0x60,0x58,0x50,0x48,0x40,0x38,0x30,0x28,0x20,0x18,0x10,0x08,0x00,  // Slope 1
+    0x38,0x38,0x30,0x30,0x28,0x28,0x20,0x20,0x18,0x18,0x10,0x10,0x08,0x08,0x00,0x00,  // Slope 2
+    0x78,0x78,0x70,0x70,0x68,0x68,0x60,0x60,0x58,0x58,0x50,0x50,0x48,0x48,0x40,0x40,  // Slope 3
+    0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,  // Slope 4
+    0x00,0x08,0x10,0x18,0x20,0x28,0x30,0x38,0x40,0x48,0x50,0x58,0x60,0x68,0x70,0x78,  // Slope 5
+    0x00,0x00,0x08,0x08,0x10,0x10,0x18,0x18,0x20,0x20,0x28,0x28,0x30,0x30,0x38,0x38,  // Slope 6
+    0x40,0x40,0x48,0x48,0x50,0x50,0x58,0x58,0x60,0x60,0x68,0x68,0x70,0x70,0x78,0x78,  // Slope 7
 };
 
 char* objmodetxts[] = {
@@ -335,6 +335,7 @@ int findnavarea(const Zone& zone, int x, int y);
 bool checkzonelegal(int num, int newx, int newy, int newsx, int newsy);
 void movezonetiles(Zone& zone, int xadd, int yadd);
 void movezoneobjects(Zone& zone, int xadd, int yadd);
+void moveallobjects(int xadd, int yadd);
 void editactors();
 void setmulticol(unsigned char& data, int x, unsigned char bits);
 void setsinglecol(unsigned char& data, int x, unsigned char bits);
@@ -2780,6 +2781,19 @@ void editzone()
 
     if (shiftdown && !ctrldown && (key == KEY_DEL || key == KEY_BACKSPACE))
     {
+        for (int c = 0; c < NUMLVLOBJ; ++c)
+        {
+            if (objects[c].sx && objects[c].sy && isinsidezone(objects[c].x, objects[c].y, zone))
+            {
+                objects[c].sx = 0;
+                objects[c].sy = 0;
+            }
+        }
+        for (int c = 0; c < NUMLVLACT; ++c)
+        {
+            if (actors[c].t && isinsidezone(actors[c].x, actors[c].y, zone))
+                actors[c].t = 0;
+        }
         zone.sx = 0;
         zone.sy = 0;
         zone.tiles.clear();
@@ -2840,10 +2854,10 @@ void editzone()
                 {
                     for (int z = 0; z < NUMZONES; ++z)
                     {
-                        movezoneobjects(zones[z], ofsx, ofsy);
                         zones[z].x += ofsx;
                         zones[z].y += ofsy;
                     }
+                    moveallobjects(ofsx, ofsy);
                 }
             }
         }
@@ -3017,6 +3031,19 @@ void editactors()
     if (dataeditmode)
     {
         oidx = dataeditoidx;
+        if (mouseb == 1 && (mousex >= 0) && (mousex < vsx*divisor) && (mousey >= 0) && (mousey < vsy*divisor))
+        {
+            int x = mapx+mousex/divisor;
+            int y = mapy+mousey/divisor;
+            for (int c = 0; c < NUMLVLOBJ; ++c)
+            {
+                if (objects[c].sx && objects[c].sy && x >= objects[c].x && y >= objects[c].y && x < (objects[c].x + objects[c].sx) && y < (objects[c].y + objects[c].sy))
+                {
+                    oidx = c;
+                    break;
+                }
+            }
+        }
         int hex = -1;
 
         if ((key == KEY_DEL) || (key == KEY_BACKSPACE))
@@ -3342,6 +3369,8 @@ void editactors()
                         ++goidx;
                 }
             }
+            if (mouseb == 1 && dataeditmode & oidx >= 0 && c == oidx)
+                objects[dataeditoidx].data = (zones[z].level << 8) | goidx;
         }
     }
 
@@ -3362,11 +3391,14 @@ void editactors()
     {
         const Actor& actor = actors[aidx];
 
+        sprintf(textbuffer, "ID%02x X%02x Y%02x", gaidx, actor.x-zx, actor.y-zy);
+        printtext_color(textbuffer, 256+16, texty, SPR_FONTS, COL_WHITE);
+
         if (actor.t <= 128)
-            sprintf(textbuffer, "ID%02x X%02x Y%02x T%02x(%s) %s W%02x (%s) %s", gaidx, actor.x-zx, actor.y-zy, actor.t, actorname[actor.t], (actor.data & 0x80) ? "L" : "R", actor.data & 0x7f, itemname[actor.data & 0x7f], (actor.flags & 1) ? "(HIDE)" : "");
+            sprintf(textbuffer, "T%02x(%s) %s W%02x(%s) %s", actor.t, actorname[actor.t], (actor.data & 0x80) ? "L" : "R", actor.data & 0x7f, itemname[actor.data & 0x7f], (actor.flags & 1) ? "(HIDE)" : "");
         else
-            sprintf(textbuffer, "ID%02x X%02x Y%02x T%02x (%s) C:%d %s", gaidx, actor.x-zx, actor.y-zy, actor.t, itemname[actor.t-128], actor.data, (actor.flags & 1) ? "(HIDE)" : "");
-        printtext_color(textbuffer, 128, texty, SPR_FONTS, COL_WHITE);
+            sprintf(textbuffer, "T%02x(%s) C:%d %s", actor.t, itemname[actor.t-128], actor.data, (actor.flags & 1) ? "(HIDE)" : "");
+        printtext_color(textbuffer, 256+16, texty+15, SPR_FONTS, COL_WHITE);
     }
     else if (oidx >= 0)
     {
@@ -3498,6 +3530,26 @@ void movezoneobjects(Zone& zone, int xadd, int yadd)
     for (int c = 0; c < NUMLVLACT; ++c)
     {
         if (actors[c].t && isinsidezone(actors[c].x, actors[c].y, zone))
+        {
+            actors[c].x += xadd;
+            actors[c].y += yadd;
+        }
+    }
+}
+
+void moveallobjects(int xadd, int yadd)
+{
+    for (int c = 0; c < NUMLVLOBJ; ++c)
+    {
+        if (objects[c].sx && objects[c].sy)
+        {
+            objects[c].x += xadd;
+            objects[c].y += yadd;
+        }
+    }
+    for (int c = 0; c < NUMLVLACT; ++c)
+    {
+        if (actors[c].t)
         {
             actors[c].x += xadd;
             actors[c].y += yadd;
@@ -4341,7 +4393,7 @@ void savealldata()
                         if (z >= 0)
                             ++numobj;
                         // Sidedoors always autodeactivating (nonpersistent)
-                        if ((object.flags & 0x1c) == 0)
+                        if ((object.flags & 0x1c) == 0 || (object.flags & 0x1c) == 0x18 || (object.flags & 0x1c) == 0x0c)
                             object.flags |= 0x40;
                     }
                 }

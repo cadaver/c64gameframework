@@ -175,7 +175,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 
 ### Object / actor editor
 
-- LMB Place object
+- LMB Place object / set data to point to this (if in object data edit mode)
 - RMB Place actor
 - , . or Z X Select actor type (faster with Shift)
 - I Switch between actors & items

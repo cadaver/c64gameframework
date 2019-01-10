@@ -8,7 +8,8 @@ MAX_SEQUENCE_LENGTH_256 = 1
 
 ; -------------------------------------------------------------------
 ; This source code is altered and is not the original version found on
-; the Exomizer homepage.
+; the Exomizer homepage. Forward decrunching modifications improved
+; based on the version in Krill's loader.
 ; -------------------------------------------------------------------
 ;
 ; Copyright (c) 2002 - 2018 Magnus Lind.
@@ -247,23 +248,16 @@ gbnc2_ok:
     else
         lda tablBi,x
         jsr get_bits
+        clc
         adc tablLo,x
-        bcc skipcarry
-        inc zpBitsHi
-        clc
-skipcarry:
         eor #$ff
-        adc #$01
         sta zpSrcLo
-        lda zpDestHi
-        sbc zpBitsHi
-        sbc tablHi,x
+        lda zpBitsHi
+        adc tablHi,x
+        eor #$ff
+        adc zpDestHi
         sta zpSrcHi
-    if LITERAL_SEQUENCES_NOT_USED = 0
-        clc
     endif
-    endif
-
 
 ; -------------------------------------------------------------------
 ; prepare for copy loop (2 bytes)
@@ -283,7 +277,11 @@ copy_skip_hi:
         dey
     endif
     if LITERAL_SEQUENCES_NOT_USED = 0
+    if FORWARD_DECRUNCHING > 0
+        bcc get_literal_byte
+    else
         bcs get_literal_byte
+    endif
     endif
         lda (zpSrcLo),y
 literal_byte_gotten:
@@ -311,8 +309,12 @@ copy_next_hi:
     if LITERAL_SEQUENCES_NOT_USED = 0
 get_literal_byte:
         jsr GetByte
+    if FORWARD_DECRUNCHING > 0
         sec
         bcs literal_byte_gotten
+    else
+        bcc literal_byte_gotten
+    endif
     endif
 ; -------------------------------------------------------------------
 ; exit or literal sequence handling (16(12) bytes)
@@ -326,8 +328,12 @@ exit_or_lit_seq:
     endif
         jsr GetByte
         tax
+    if FORWARD_DECRUNCHING > 0
+        bcc copy_next
+    else
         sec
         bcs copy_next
+    endif
 decr_exit:
     endif
         clc
