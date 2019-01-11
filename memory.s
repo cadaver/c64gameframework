@@ -212,16 +212,16 @@ screen          = $f800
 emptySprite     = $fc00
 miscVarArea2    = $fc40
 
-                varbase panelScreen+24*40
+                varbase panelScreen+24*40-1
                 varrange boundsAct,MAX_BOUNDS
-                varrange sprAct,MAX_SPR
+                varrange sprY,MAX_SPR+1
                 checkvarbase panelScreen+1016
 
                 varbase screen+SCROLLROWS*40
                 varrange sprX,MAX_SPR
-                varrange sprY,MAX_SPR
                 varrange sprF,MAX_SPR
                 varrange sprC,MAX_SPR
+                varrange sprAct,MAX_SPR
                 checkvarbase screen+1016
 
                 varbase miscVarArea1
@@ -245,15 +245,6 @@ miscVarArea2    = $fc40
                 varrange lvlActT,MAX_LVLACT
                 varrange lvlActWpn,MAX_LVLACT
                 varrange lvlActOrg,MAX_LVLACT
-
-                checkvarbase screen
-
-                varbase screen+SCROLLROWS*40
-                varrange sprX,MAX_SPR
-                varrange sprY,MAX_SPR
-                varrange sprF,MAX_SPR
-                varrange sprC,MAX_SPR
-                checkvarbase screen+1016
 
                 varbase miscVarArea2
 
