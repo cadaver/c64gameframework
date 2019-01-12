@@ -316,6 +316,7 @@ IA_LastAct:     cpy #$00
                 beq IA_SameAct
 IA_CalculateMove:
                 sty IA_LastAct+1
+                sec
                 lda actPrevYH,y                 ;If interpolation disable marked with high bit in prevYH,
                 bmi IA_NoInterpolation          ;use only the scrolling offset
                 lda actXL,y                     ;Calculate average movement of actor in X-direction
@@ -360,7 +361,7 @@ IA_ScrollXAdjust:
                 ora #$f0
 IA_YMovePos:
 IA_ScrollYAdjust:
-                adc #$00                        ;Add scrolling + LSB
+                adc #$00                        ;Add scrolling
 IA_StoreYAdjust:sta zpDestHi
 IA_SameAct:     lda sprX,x                      ;Now add the calculated interpolation offsets
                 clc
@@ -376,7 +377,6 @@ IA_Next:        inx
                 bcs IA_Done
 
 IA_NoInterpolation:
-                lda #$ff
                 lda IA_ScrollXAdjust+1          ;No interpolation: skip average movement calculation,
                 sta zpDestLo                    ;use just scrolling offset
                 lda IA_ScrollYAdjust+1

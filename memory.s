@@ -213,8 +213,8 @@ emptySprite     = $fc00
 miscVarArea2    = $fc40
 
                 varbase panelScreen+24*40-1
-                varrange boundsAct,MAX_BOUNDS
                 varrange sprY,MAX_SPR+1
+                varrange boundsAct,MAX_BOUNDS
                 checkvarbase panelScreen+1016
 
                 varbase screen+SCROLLROWS*40
