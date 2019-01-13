@@ -84,8 +84,7 @@ LF_Uncompressed:sta zpDestLo
                 stx zpDestHi
                 lda dataSizeHi
                 sta zpBitsHi
-                lda dataSizeLo
-                sta zpBitsLo
+                ldx dataSizeLo
                 beq LF_UncompressedPredecrement
 LF_UncompressedLoop:
                 jsr GetByte
@@ -95,7 +94,7 @@ LF_UncompressedStore:
                 bne LF_UncompressedNoDestHi
                 inc zpDestHi
 LF_UncompressedNoDestHi:
-                dec zpBitsLo
+                dex
                 bne LF_UncompressedLoop
 LF_UncompressedPredecrement:
                 dec zpBitsHi
