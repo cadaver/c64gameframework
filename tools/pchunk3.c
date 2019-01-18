@@ -10,7 +10,7 @@ int main(int argc, char **argv)
   char cmd[256];
   if (argc < 3)
   {
-    printf("Invokes exomizer3 raw mode with max. length 256 and no literal sequences, output with chunkfile header\nUsage: pchunk3 <infile> <outfile>\n");
+    printf("Invokes exomizer3 raw mode with max. length 256, output with chunkfile header\nUsage: pchunk3 <infile> <outfile>\n");
     return 1;
   }
   in = fopen(argv[1], "rb");
@@ -29,7 +29,7 @@ int main(int argc, char **argv)
   fclose(in);
   fclose(out);
   
-  sprintf(cmd, "exomizer3 raw -T4 -M256 -c -o%s %s", "temp2.bin", "temp.bin");
+  sprintf(cmd, "exomizer3 raw -T4 -M256 -o%s %s", "temp2.bin", "temp.bin");
   val = system(cmd);
   if (val > 0) return val;
 

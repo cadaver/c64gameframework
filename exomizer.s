@@ -3,7 +3,7 @@ tablLo          = depackBuffer + 52
 tablHi          = depackBuffer + 104
 
 FORWARD_DECRUNCHING = 1
-LITERAL_SEQUENCES_NOT_USED = 1
+LITERAL_SEQUENCES_NOT_USED = 0
 MAX_SEQUENCE_LENGTH_256 = 1
 
 ; -------------------------------------------------------------------
@@ -145,6 +145,7 @@ no_fixup_lohi:
         ldy zpDestLo
         stx zpDestLo
         stx zpBitsHi
+
 ; -------------------------------------------------------------------
 ; copy one literal byte to destination (11 bytes)
 ;
@@ -300,7 +301,13 @@ copy_skip_hi:
     endif
 begin_stx:
         stx zpBitsHi
+    if (FORWARD_DECRUNCHING > 0 && MAX_SEQUENCE_LENGTH_256 = 0 && LITERAL_SEQUENCES_NOT_USED = 0)
+        bne no_next_round
+        jmp next_round
+no_next_round:
+    else
         beq next_round
+    endif
     if MAX_SEQUENCE_LENGTH_256 = 0
 copy_next_hi:
         dec zpLenHi
@@ -310,10 +317,10 @@ copy_next_hi:
 get_literal_byte:
         jsr GetByte
     if FORWARD_DECRUNCHING > 0
+        bcc literal_byte_gotten
+    else
         sec
         bcs literal_byte_gotten
-    else
-        bcc literal_byte_gotten
     endif
     endif
 ; -------------------------------------------------------------------
