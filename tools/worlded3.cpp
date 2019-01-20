@@ -4963,7 +4963,7 @@ std::vector<unsigned char> exomize(unsigned char* data, int datasize)
     write(exosrchandle, data, datasize);
     close(exosrchandle);
 
-    system("exomizer3 raw -T4 -M256 -otemp.pak temp.bin");
+    system("exomizer3 raw -T4 -M256 -c -otemp.pak temp.bin");
     exodesthandle = open("temp.pak", O_RDONLY|O_BINARY, S_IREAD);
 
     std::vector<unsigned char> ret;
@@ -5711,6 +5711,8 @@ bool checkuseoptimize(const ColorBuffer& cbuf, int x, int y, const Zone& zone, b
     unsigned char cbl = getcolorfrombuffer(cbuf, cx, cy+1, 0);
     unsigned char cbr = getcolorfrombuffer(cbuf, cx+1, cy+1, 0);
     if (zone.sx > SCREENSIZEX && x == zone.sx-1) // At right edge rubbish gets drawn, so cannot optimize
+        ret = false;
+    else if (zone.sy > SCREENSIZEY && y == zone.sy-1) // At bottom rubbish gets drawn, so cannot optimize
         ret = false;
     else if (ctl >= 0x10) // Animating block or already optimized, cannot optimize self
         ret = false;

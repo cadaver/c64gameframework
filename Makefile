@@ -45,7 +45,7 @@ main.pak: loadsym.s ldepacksym.s memory.s defines.s main.s init.s input.s file.s
 music00.pak: music/example.sng
 	gt2mini music/example.sng music00.s -ed000
 	dasm music00.s -omusic00.prg -p3
-	exomizer3 level -M256 -f -omusic00.pak music00.prg
+	exomizer3 level -M256 -f -c -omusic00.pak music00.prg
 
 level00.pak: bg/world00.map bg/world00.lvo bg/world00.lva level00.s
 	dasm level00.s -olevel00.bin -f3

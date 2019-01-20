@@ -11,6 +11,6 @@ int main(int argc, char **argv)
     return 1;
   }
 
-  sprintf(cmd, "exomizer3 raw -T4 -M256 -o%s %s", argv[2], argv[1]);
+  sprintf(cmd, "exomizer3 raw -T4 -M256 -c -o%s %s", argv[2], argv[1]);
   return system(cmd);
 }

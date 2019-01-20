@@ -29,7 +29,7 @@ int main(int argc, char **argv)
   fclose(in);
   fclose(out);
   
-  sprintf(cmd, "exomizer3 raw -T4 -M256 -o%s %s", "temp2.bin", "temp.bin");
+  sprintf(cmd, "exomizer3 raw -T4 -M256 -c -o%s %s", "temp2.bin", "temp.bin");
   val = system(cmd);
   if (val > 0) return val;
 

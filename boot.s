@@ -68,16 +68,9 @@ ShowMessage:    lda #$0f
                 dey
                 bne ShowMessage
 LoadExomizer:   jsr ChrIn                       ;Load Exomizer (unpacked)
-LoadExomizerSta:sta exomizerCodeStart
-                inc LoadExomizerSta+1
-                bne LoadExomizerNoMSB
-                inc LoadExomizerSta+2
-LoadExomizerNoMSB:
-                lda LoadExomizerSta+1
-                cmp #<packedLoaderStart
-                bne LoadExomizer
-                lda LoadExomizerSta+2
-                cmp #>packedLoaderStart
+                sta exomizerCodeStart,y
+                iny
+                cpy #(packedLoaderStart-exomizerCodeStart)
                 bne LoadExomizer
                 lda #>(InitLoader-1)            ;Load loader (packed), then run it
                 pha

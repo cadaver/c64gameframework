@@ -3,7 +3,7 @@ tablLo          = depackBuffer + 52
 tablHi          = depackBuffer + 104
 
 FORWARD_DECRUNCHING = 1
-LITERAL_SEQUENCES_NOT_USED = 0
+LITERAL_SEQUENCES_NOT_USED = 1
 MAX_SEQUENCE_LENGTH_256 = 1
 
 ; -------------------------------------------------------------------
