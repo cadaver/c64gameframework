@@ -251,12 +251,12 @@ UF_WaitSprites: lda newFrameFlag                ;Wait for previous sprite update
                 lda firstSortSpr                ;Switch sprite doublebuffer side
                 eor #MAX_SPR
                 sta firstSortSpr
-                tay
+                tax
                 lda #<sprOrder
                 sec
                 sbc firstSortSpr
                 sta UF_CopyLoop1+1
-                tya
+                txa
                 adc #8-1                        ;C=1
                 sta UF_CopyLoop1EndCmp+1        ;Set endpoint for first copyloop
                 lda #$80
@@ -264,53 +264,53 @@ UF_WaitSprites: lda newFrameFlag                ;Wait for previous sprite update
                 bmi UF_CopyLoop1
 UF_CopyLoop1Skip:
                 inc UF_CopyLoop1+1
-UF_CopyLoop1:   ldx sprOrder,y
-                lda sprY,x                      ;If reach the maximum Y-coord endmark, all done
+UF_CopyLoop1:   ldy sprOrder,x
+                lda sprY,y                      ;If reach the maximum Y-coord endmark, all done
                 cmp #MAX_SPRY
                 bcs UF_CopyLoop1Done
-                sta sortSprY,y
-                lda sprC,x
+                sta sortSprY,x
+                lda sprC,y
                 bmi UF_CopyLoop1Skip            ;Flickering sprite?
-                sta sortSprC,y
+                sta sortSprC,x
                 and #COLOR_XEXPAND
                 beq UF_CopyLoop1NoXExpand
                 lda zpDestHi
                 ora zpBitBuf
                 sta zpDestHi
-                lda sprX,x
+                lda sprX,y
                 cmp #MAX_SPRX_EXPANDED/2       ;Do X-coord edge adjust for expanded sprite
                 bcc UF_CopyLoop1EdgeAdjustDone
                 sbc #$04
                 bcs UF_CopyLoop1EdgeAdjustDone
 UF_CopyLoop1NoXExpand:
-                lda sprX,x
+                lda sprX,y
 UF_CopyLoop1EdgeAdjustDone:
                 asl
 UF_SprXLSB1:    ora #$00
-                sta sortSprX,y
+                sta sortSprX,x
                 bcc UF_CopyLoop1MsbLow
                 lda zpDestLo
                 ora zpBitBuf
                 sta zpDestLo
 UF_CopyLoop1MsbLow:
-                lda sprF,x
-                sta sortSprF,y
+                lda sprF,y
+                sta sortSprF,x
                 lsr zpBitBuf
-                iny
+                inx
 UF_CopyLoop1EndCmp:
-                cpy #$00
+                cpx #$00
                 bcc UF_CopyLoop1
 UF_CopyLoop1Done:
                 lda zpDestLo
-                sta sortSprXMSB-1,y
+                sta sortSprXMSB-1,x
                 lda zpDestHi
-                sta sortSprXExpand-1,y
+                sta sortSprXExpand-1,x
                 lda #$7f                        ;Sprite AND-bit (needing OR is rarer)
                 sta zpBitBuf
                 lda UF_CopyLoop1+1              ;Copy sortindex from first copyloop
                 sta UF_CopyLoop2+1              ;to second
                 sta UF_CopyLoop2B+1
-                cpy firstSortSpr                ;Any sprites at all?
+                cpx firstSortSpr                ;Any sprites at all?
                 beq UF_NoSprites                ;Make first (and final) IRQ endmask
                 jmp UF_EndMark
 UF_NoSprites:   jmp UF_AllDone                  ;C=1 if jumping to AllDone
@@ -319,81 +319,81 @@ UF_CopyLoop2SkipB:
                 inc UF_CopyLoop2B+1
                 bne UF_CopyLoop2B
 UF_CopyLoop2Next:
-                lda sprC,x                      ;TODO: check if can be made to combine IRQs more eagerly
+                lda sprC,y                      ;TODO: check if can be made to combine IRQs more eagerly
                 bmi UF_CopyLoop2SkipB           ;Flickering sprite?
 UF_CopyLoop2Begin:
-                sta sortSprC,y
+                sta sortSprC,x
                 and #COLOR_XEXPAND
                 beq UF_CopyLoop2NoXExpand
                 lda zpBitBuf
                 eor #$ff
-                ora sortSprXExpand-1,y
-                sta sortSprXExpand,y
-                lda sprX,x
+                ora sortSprXExpand-1,x
+                sta sortSprXExpand,x
+                lda sprX,y
                 cmp #MAX_SPRX_EXPANDED/2        ;Do X-coord edge adjust for expanded sprite
                 bcc UF_CopyLoop2EdgeAdjustDone
                 sbc #$04
                 bcs UF_CopyLoop2EdgeAdjustDone
 UF_CopyLoop2NoXExpand:
-                lda sortSprXExpand-1,y
+                lda sortSprXExpand-1,x
                 and zpBitBuf
-                sta sortSprXExpand,y
-                lda sprX,x
+                sta sortSprXExpand,x
+                lda sprX,y
 UF_CopyLoop2EdgeAdjustDone:
                 asl
 UF_SprXLSB2:    ora #$00
-                sta sortSprX,y
+                sta sortSprX,x
                 bcc UF_CopyLoop2MsbLow
                 lda zpBitBuf
                 eor #$ff
-                ora sortSprXMSB-1,y
+                ora sortSprXMSB-1,x
                 bne UF_CopyLoop2MsbDone
 UF_CopyLoop2MsbLow:
-                lda sortSprXMSB-1,y
+                lda sortSprXMSB-1,x
                 and zpBitBuf
 UF_CopyLoop2MsbDone:
-                sta sortSprXMSB,y
-                lda sprF,x
-                sta sortSprF,y
-                iny
+                sta sortSprXMSB,x
+                lda sprF,y
+                sta sortSprF,x
+                inx
                 sec
                 ror zpBitBuf
                 bcs UF_CopyLoop2B
                 ror zpBitBuf                    ;Start the AND bit over from $7f
-UF_CopyLoop2B:  ldx sprOrder,y
-                lda sprY,x
+UF_CopyLoop2B:  ldy sprOrder,x
+                lda sprY,y
                 cmp #MAX_SPRY
                 bcs UF_CopyLoop2EndIrq          ;Reached end - no further IRQs
-                sta sortSprY,y
+                sta sortSprY,x
                 sbc #21-1
-                cmp sortSprY-8,y                ;Check for physical sprite overlap
+                cmp sortSprY-8,x                ;Check for physical sprite overlap
                 bcc UF_CopyLoop2SkipB
 UF_CopyLoop2YCmp:
                 cmp #$00                        ;Include in the same IRQ?
                 bcc UF_CopyLoop2Next
 UF_CopyLoop2EndIrq:
-                tya
+                txa
                 sbc zpSrcLo
-                tax
-                lda sprIrqAdvanceTbl-1,x
-                ldx zpSrcLo
-                adc sortSprY,x
-                sta sprIrqLine-1,x              ;Store IRQ start line (with advance based on sprite count)
-UF_EndMark:     lda sortSprC-1,y                ;Make IRQ endmark
+                tay
+                lda sprIrqAdvanceTbl-1,y
+                ldy zpSrcLo
+                adc sortSprY,y
+                sta sprIrqLine-1,y              ;Store IRQ start line (with advance based on sprite count)
+UF_EndMark:     lda sortSprC-1,x                ;Make IRQ endmark
                 ora #$80
-                sta sortSprC-1,y
-UF_CopyLoop2:   ldx sprOrder,y
-                lda sprY,x
+                sta sortSprC-1,x
+UF_CopyLoop2:   ldy sprOrder,x
+                lda sprY,y
                 cmp #MAX_SPRY
                 bcs UF_FinalEndMark             ;Reached end - no further IRQs
-                sta sortSprY,y
+                sta sortSprY,x
                 sbc #21-1
-                cmp sortSprY-8,y                ;Check for physical sprite overlap
+                cmp sortSprY-8,x                ;Check for physical sprite overlap
                 bcc UF_CopyLoop2Skip
-                sty zpSrcLo                     ;Store IRQ startindex
+                stx zpSrcLo                     ;Store IRQ startindex
                 adc #5-1                        ;Store end Y compare for further sprites
                 sta UF_CopyLoop2YCmp+1
-                lda sprC,x
+                lda sprC,y
                 bmi UF_CopyLoop2Skip
                 jmp UF_CopyLoop2Begin
 UF_CopyLoop2Skip:
@@ -401,27 +401,27 @@ UF_CopyLoop2Skip:
                 inc UF_CopyLoop2B+1
                 bne UF_CopyLoop2
 UF_FinalEndMark:lda #$00                        ;Make final endmark, C=1 here
-                sta sprIrqLine-1,y
-UF_AllDone:     sty SSR_LastSortSpr+1           ;C=1 if jumping here from earlier
-                tya                             ;Check which sprites are on
+                sta sprIrqLine-1,x
+UF_AllDone:     stx SSR_LastSortSpr+1           ;C=1 if jumping here from earlier
+                txa                             ;Check which sprites are on
                 sbc firstSortSpr
                 cmp #$09
                 bcc UF_NotMoreThan8
                 lda #$08
-UF_NotMoreThan8:tax
+UF_NotMoreThan8:tay
 UF_RemoveLSBLoop:
-                dey                             ;Check for overlay sprites
+                dex
                 bmi UF_SpritesDone
-                lda sortSprC,y
+                lda sortSprC,x
                 and #COLOR_OVERLAY
                 beq UF_RemoveLSBNext
-                lda sortSprX,y
+                lda sortSprX,x
                 ora #$01
-                sta sortSprX,y
+                sta sortSprX,x
 UF_RemoveLSBNext:
-                cpy firstSortSpr
+                cpx firstSortSpr
                 bne UF_RemoveLSBLoop
-UF_SpritesDone: lda d015Tbl,x
+UF_SpritesDone: lda d015Tbl,y
                 pha
                 lda scrCounter                  ;Is it the screen shift? Needs strict timing, so in that case trigger
                 beq UF_NoScreenShift            ;whole frameupdate from the IRQ, *but* we can calculate already ahead
@@ -525,8 +525,6 @@ UF_WaitDone:    if SHOW_FREE_TIME > 0
                 sta Irq1_ScrollX+1
                 dec newFrameFlag                ;$ff = process new frame
 UF_NoScrollWork:jmp UpdatePanel
-
-
 
         ; Prepare full redraw of screen.
         ;
