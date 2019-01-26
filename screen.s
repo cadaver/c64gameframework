@@ -39,15 +39,11 @@ RS_ClearScrollVars:
                 dex
                 bpl RS_ClearScrollVars
                 jsr RS_ToggleOptimize
-                jsr GetZoneObject
-                ldy #ZONEH_BG1
-                lda (zpSrcLo),y                 ;Set zone colors
+                lda zoneBg1                     ;Set zone colors
                 sta Irq1_Bg1+1
-                iny
-                lda (zpSrcLo),y
+                lda zoneBg2
                 sta Irq1_Bg2+1
-                iny
-                lda (zpSrcLo),y
+                lda zoneBg3
                 sta Irq1_Bg3+1
                 lda #GAMESCR_D018
                 sta Irq1_D018+1

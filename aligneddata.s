@@ -196,6 +196,7 @@ N               set N+16
         ; Must be before save to know save size
 
                 include bg/worldinfo.s
+                include bg/worlddata.s
 
         ; Playroutine
 
@@ -287,5 +288,3 @@ saveBits:       ds.b LEVELACTBITSIZE,$ff        ;All actors initially exist
                 ds.b LEVELOBJBITSIZE,0          ;All objects initially inactive
 
 saveStateEnd:
-
-getByteJump:    jmp DFM_GetByte                 ;Getbyte jump for loading from memory

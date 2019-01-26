@@ -11,16 +11,6 @@ NUM_PANELROW_LOCATIONS = 2
 
 InitAll:        sei
 
-        ; Initialize switching to depacking from memory
-
-                ldx #$02
-IA_SwitchGetByte:
-                lda getByteJump,x
-                eor GetByte,x
-                sta getByteJump,x
-                dex
-                bpl IA_SwitchGetByte
-
         ; Setup preparations for loading
 
                 lda loaderMode

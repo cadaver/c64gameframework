@@ -49,8 +49,7 @@ zpLenHi         = zpBitsLo                      ;Exomizer 3 doesn't use zpBitsLo
                 var zoneBufferLo
                 var zoneBufferHi
 
-                var lastNavArea                 ;Misc game vars
-                var nextLvlActIndex
+                var nextLvlActIndex             ;Misc. game vars
 
                 varrange actXH,MAX_ACT          ;Actor ZP variables
                 varrange actYH,MAX_ACT
@@ -66,7 +65,29 @@ zpLenHi         = zpBitsLo                      ;Exomizer 3 doesn't use zpBitsLo
                 var prevJoy
                 var keyType
 
-                var scrollX                     ;Screen / level variables
+                var levelNum                    ;Zone / level variables
+                var zoneNum
+                var mapSizeX
+                var mapSizeY
+                var zoneBg1
+                var zoneBg2
+                var zoneBg3
+                var lastNavArea
+
+                var animObj                     ;Levelobject variables. First 3 also used in zone init
+                var animObjFrame
+                var animObjTarget
+                var usableObj
+                var autoDeactObj
+                var atObj
+
+                checkvarbase $b7
+
+                varbase $c0
+
+                varrange sprOrder,MAX_SPR+1
+
+                var scrollX                     ;Scrolling variables
                 var scrollY
                 var scrollSX
                 var scrollSY
@@ -75,23 +96,6 @@ zpLenHi         = zpBitsLo                      ;Exomizer 3 doesn't use zpBitsLo
                 var blockY
                 var mapX
                 var mapY
-                var mapSizeX
-                var mapSizeY
-                var levelNum
-                var zoneNum
-
-                checkvarbase $b6
-
-                varbase $c0
-
-                varrange sprOrder,MAX_SPR+1
-
-                var atObj                       ;Levelobject variables
-                var usableObj
-                var autoDeactObj
-                var animObj
-                var animObjFrame
-                var animObjTarget
 
                 var textTime                    ;Text printing variables
                 var textLeftMargin
@@ -123,6 +127,10 @@ textCursor      = loadBufferPos                 ;Reused during text printing (sh
 
 dataSizeLo      = xHi                           ;Reused during resource load
 dataSizeHi      = yHi
+
+zoneCharset     = animObj                       ;Reused during zone init
+zoneDataOffsetLo = animObjFrame
+zoneDataOffsetHi = animObjTarget
 
 complexSprCount = xHi                           ;Reused during actor render
 complexSprTemp  = yHi
@@ -173,9 +181,6 @@ lineY           = yLo
 lineYCopy       = xHi
 lineSlope       = yHi
 lineCount       = zpBitsLo
-
-mapPtrLo        = xLo                           ;Zone init
-mapPtrHi        = yLo
 
 aoEndFrame      = xLo                           ;Object animation
 aoTemp          = yLo

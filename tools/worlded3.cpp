@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <vector>
 #include <map>
+#include <algorithm>
 
 extern "C" {
 
@@ -31,6 +32,7 @@ extern "C" {
 #define NUMNAVAREAS 48
 #define MAXLVLOBJ 96
 #define MAXLVLACT 96
+#define MAXGLOBALACT 32
 
 #define EM_SHAPE 0
 #define EM_MAP 1
@@ -70,6 +72,12 @@ extern "C" {
 #define NAVAREA_SLOPEUPRIGHT 3
 #define NAVAREA_SLOPEUPLEFT 4
 
+#define MINSEQ 3
+#define MAXSEQ 24
+#define RANGE MAXSEQ
+#define ESCAPE (256-(2*RANGE))
+#define MAXOFS 256
+
 struct Shape
 {
     unsigned char sx;
@@ -77,6 +85,13 @@ struct Shape
     unsigned char chardata[MAXSHAPESIZE*MAXSHAPESIZE*8];
     unsigned char charcolors[MAXSHAPESIZE*MAXSHAPESIZE];
     unsigned char blockinfos[MAXSHAPEBLOCKSIZE*MAXSHAPEBLOCKSIZE];
+    int usecount;
+};
+
+struct ShapeBlockUse
+{
+    unsigned char num;
+    unsigned sortkey;
     int usecount;
 };
 
@@ -319,6 +334,7 @@ void initcolorbuffer(ColorBuffer& cbuf, const Zone& src);
 void editnavareas();
 void updatenavareas(Zone& zone);
 void drawshapebuffer(ColorBuffer& cbuf, int x, int y, unsigned char num, const Zone& zone);
+void reorderblocks(int index);
 bool checkuseoptimize(const ColorBuffer& cbuf, int x, int y, const Zone& src, bool count);
 unsigned char getcolorfrombuffer(const ColorBuffer& cbuf, int cx, int cy, unsigned char outside);
 bool checkusecharcolor(const unsigned char* chardata, unsigned char chcol);
@@ -370,8 +386,9 @@ void saveshape(int handle, const Shape& shape);
 void importblocks();
 void loadalldata();
 void savealldata();
-std::vector<unsigned char> exomize(unsigned char* data, int datasize);
-std::vector<unsigned char> rlepack(unsigned char* data, int datasize);
+void packzone(unsigned char* data, int length, std::vector<unsigned char>& outdata);
+void findrle(unsigned char* data, int pos, int length, unsigned char& rlebyte, int& rlelen);
+void findsequence(unsigned char* data, int pos, int length, int& seqofs, int& seqlen);
 void exportpng();
 void nukecharset();
 void optimizecharset();
@@ -2264,6 +2281,17 @@ void drawmap()
                         gfx_line(ax*divisor,ay*divisor,ax*divisor,ay*divisor+(divisor/2-1),1);
                         gfx_line(ax*divisor+divisor-1,ay*divisor,ax*divisor+divisor-1,ay*divisor+(divisor/2-1),1);
                     }
+                    if (actor.flags & 2)
+                    {
+                        gfx_line(ax*divisor,ay*divisor,ax*divisor+divisor-1,ay*divisor,1);
+                        gfx_line(ax*divisor,ay*divisor+(divisor/2-1),ax*divisor+divisor-1,ay*divisor+(divisor/2-1),1);
+                        gfx_line(ax*divisor,ay*divisor,ax*divisor,ay*divisor+(divisor/2-1),1);
+                        gfx_line(ax*divisor+divisor-1,ay*divisor,ax*divisor+divisor-1,ay*divisor+(divisor/2-1),1);
+                        gfx_line(ax*divisor-2,ay*divisor-2,ax*divisor+divisor-1+2,ay*divisor-2,1);
+                        gfx_line(ax*divisor-2,ay*divisor+(divisor/2-1)+2,ax*divisor+divisor-1+2,ay*divisor+(divisor/2-1)+2,1);
+                        gfx_line(ax*divisor-2,ay*divisor-2,ax*divisor-2,ay*divisor+(divisor/2-1)+2,1);
+                        gfx_line(ax*divisor+divisor-1+2,ay*divisor-2,ax*divisor+divisor-1+2,ay*divisor+(divisor/2-1)+2,1);
+                    }
 
                     if (!zoomout)
                     {
@@ -3221,6 +3249,10 @@ void editactors()
                 {
                     actors[aidx].flags ^= 1;
                 }
+                if (key == KEY_G)
+                {
+                    actors[aidx].flags ^= 2;
+                }
                 if (key == KEY_DEL)
                 {
                     actors[aidx].t = 0;
@@ -3323,11 +3355,12 @@ void editactors()
     int levelobjects = 0;
     int allobjects = 0;
     int zoneobjects = 0;
+    int globalactors = 0;
 
     int gaidx = 0;
     int goidx = 0;
-    int zx = zones[zonenum].x;
-    int zy = zones[zonenum].y;
+    int zx = 0;
+    int zy = 0;
 
     for (int c = 0; c < NUMLVLACT; ++c)
     {
@@ -3344,10 +3377,21 @@ void editactors()
                     ++levelactors;
                 if (c < aidx)
                 {
-                    if (zones[z].level == zones[zonenum].level)
-                        ++gaidx;
+                    if ((actors[c].flags & 2) == 0)
+                    {
+                        if (zones[z].level == zones[zonenum].level)
+                            ++gaidx;
+                    }
+                }
+                if (c == aidx)
+                {
+                    zx = zone.x;
+                    zy = zone.y;
                 }
             }
+
+            if (actors[c].flags & 2)
+                ++globalactors;
         }
     }
     for (int c = 0; c < NUMLVLOBJ; ++c)
@@ -3368,6 +3412,11 @@ void editactors()
                     if (zones[z].level == zones[zonenum].level)
                         ++goidx;
                 }
+                if (c == oidx)
+                {
+                    zx = zones[z].x;
+                    zy = zones[z].y;
+                }
             }
             if (mouseb == 1 && dataeditmode & oidx >= 0 && c == oidx)
                 objects[dataeditoidx].data = (zones[z].level << 8) | goidx;
@@ -3376,7 +3425,7 @@ void editactors()
 
     sprintf(textbuffer, "LEVEL   %d", zones[zonenum].level);
     printtext_color(textbuffer, 128, texty, SPR_FONTS, COL_WHITE);
-    sprintf(textbuffer, "ACTORS  %d/%d/%d", zoneactors, levelactors, allactors);
+    sprintf(textbuffer, "ACTORS  %d/%d/%d/%d", zoneactors, levelactors, allactors, globalactors);
     printtext_color(textbuffer, 128, texty+15, SPR_FONTS, COL_WHITE);
     sprintf(textbuffer, "OBJECTS %d/%d/%d", zoneobjects, levelobjects, allobjects);
     printtext_color(textbuffer, 128, texty+30, SPR_FONTS, COL_WHITE);
@@ -3391,7 +3440,10 @@ void editactors()
     {
         const Actor& actor = actors[aidx];
 
-        sprintf(textbuffer, "ID%02x X%02x Y%02x", gaidx, actor.x-zx, actor.y-zy);
+        if ((actor.flags & 2) == 0)
+            sprintf(textbuffer, "ID%02x X%02x Y%02x", gaidx, actor.x-zx, actor.y-zy);
+        else
+            sprintf(textbuffer, "GLOB X%02x Y%02x", actor.x-zx, actor.y-zy);
         printtext_color(textbuffer, 256+16, texty, SPR_FONTS, COL_WHITE);
 
         if (actor.t <= 128)
@@ -4288,7 +4340,10 @@ void savealldata()
                 Charset& charset = charsets[c];
                 packcharset(c);
                 if (charset.usedchars > 2 || charset.usedblocks > 2)
+                {
+                    reorderblocks(c);
                     maxusedcharset = c;
+                }
             }
 
             strcpy(levelname, ib1);
@@ -4307,6 +4362,7 @@ void savealldata()
                 }
                 close(handle);
             }
+
             // All zones
             sprintf(ib2, "%s.map", ib1);
             handle = open(ib2, O_RDWR|O_BINARY|O_TRUNC|O_CREAT, S_IREAD|S_IWRITE);
@@ -4475,7 +4531,6 @@ void savealldata()
                                 {
                                     // Find corresponding shapenum at object
                                     int t = findobjectshape(obj.x, obj.y, zone);
-                                    //printf("Object %d using shape %d for animation with %d frames\n", o, t, obj.frames);
                                     if (t >= 0)
                                     {
                                         if (charset.objectanimmap.find(t) == charset.objectanimmap.end())
@@ -4485,7 +4540,6 @@ void savealldata()
                                             for (int f = t; f < t + obj.frames; ++f)
                                             {
                                                 const Shape& shape = charset.shapes[f];
-                                                //printf("Saving shape %d for animation sx %d sy %d\n", f, shape.sx, shape.sy);
                                                 for (int cy = 0; cy < shape.sy; cy += 2)
                                                 {
                                                     for (int cx = 0; cx < shape.sx; cx += 2)
@@ -4600,11 +4654,6 @@ void savealldata()
                     continue;
                 int activezones = level.zones.size();
                 int datasize = 0;
-                std::vector<std::vector<unsigned char> > zoneheaders;
-                std::vector<std::vector<unsigned char> > packdata;
-                std::vector<unsigned short> objectoffsets;
-
-                datasize = (activezones)*2;
 
                 unsigned char levelactordata[5*MAXLVLACT];
                 memset(levelactordata, 0, sizeof levelactordata);
@@ -4615,20 +4664,23 @@ void savealldata()
                     if (actors[c].t)
                     {
                         const Actor& actor = actors[c];
-                        int z = findzone(actor.x, actor.y);
-                        if (z >= 0 && zones[z].level == s)
+                        if ((actor.flags & 2) == 0)
                         {
-                            const Zone& zone = zones[z];
-                            levelactordata[usedact+0*MAXLVLACT] = actor.x - zone.x;
-                            levelactordata[usedact+1*MAXLVLACT] = actor.y - zone.y;
-                            levelactordata[usedact+2*MAXLVLACT] = zone.id;
-                            levelactordata[usedact+3*MAXLVLACT] = actor.t;
-                            levelactordata[usedact+4*MAXLVLACT] = actor.data;
-                            if (actor.flags & 1)
-                                levelactordata[usedact+1*MAXLVLACT] |= 0x80; // Hide flag
-                            ++usedact;
-                            if (usedact == MAXLVLACT)
-                                break;
+                            int z = findzone(actor.x, actor.y);
+                            if (z >= 0 && zones[z].level == s)
+                            {
+                                const Zone& zone = zones[z];
+                                levelactordata[usedact+0*MAXLVLACT] = actor.x - zone.x;
+                                levelactordata[usedact+1*MAXLVLACT] = actor.y - zone.y;
+                                levelactordata[usedact+2*MAXLVLACT] = zone.id;
+                                levelactordata[usedact+3*MAXLVLACT] = actor.t;
+                                levelactordata[usedact+4*MAXLVLACT] = actor.data;
+                                if (actor.flags & 1)
+                                    levelactordata[usedact+1*MAXLVLACT] |= 0x80; // Hide flag
+                                ++usedact;
+                                if (usedact == MAXLVLACT)
+                                    break;
+                            }
                         }
                     }
                 }
@@ -4684,7 +4736,11 @@ void savealldata()
                     close(handle);
                 }
 
-                // Packed objects in the .map file: each zone (+ uncompressed header)
+                std::vector<unsigned char> zoneheaders;
+                std::vector<unsigned char> zonedata;
+                std::vector<unsigned short> objectoffsets;
+
+                // Objects in the .map file: zone headers (all in 1 object) and zone packed data + navinfos (in another object)
                 for (int z = 0; z < level.zones.size(); ++z)
                 {
                     Zone& zone = zones[level.zones[z]];
@@ -4694,41 +4750,15 @@ void savealldata()
                     zone.navareasdirty = true; // Make sure to refresh
                     updatenavareas(zone);
 
-                    std::vector<unsigned char> headerdata;
-                    headerdata.push_back(zone.charset);
-                    headerdata.push_back(zone.sx);
-                    headerdata.push_back(zone.sy);
-                    headerdata.push_back(zone.bg1);
-                    headerdata.push_back(zone.bg2);
-                    headerdata.push_back(zone.bg3);
-
-                    for (int c = 0; c < zone.navareas.size(); ++c)
-                    {
-                        headerdata.push_back(zone.navareas[c].disabled ? 0xff : zone.navareas[c].type);
-                        headerdata.push_back(zone.navareas[c].l);
-                        headerdata.push_back(zone.navareas[c].r);
-                        headerdata.push_back(zone.navareas[c].u);
-                        headerdata.push_back(zone.navareas[c].d);
-                    }
-                    headerdata.push_back(0);
-
-                    zoneheaders.push_back(headerdata);
-
                     const Charset& charset = charsets[zone.charset];
-                    // Add one row of emptiness for the shake effect, mapdata must also be even rowcount due to interleaving
-                    int zoneysize = zone.sy+1;
-                    if (zoneysize & 1)
-                        ++zoneysize;
-                    int zonemapdatasize = zone.sx * zoneysize;
+                    int zonemapdatasize = zone.sx * (zone.sy+1); // One extra row for shake effect
                     int num = level.zones[z];
                     totalmapdatasize += zonemapdatasize;
                     screensize += (zone.sx / SCREENSIZEX) * (zone.sy / SCREENSIZEY);
 
                     unsigned char* zonemapdata = new unsigned char[zonemapdatasize];
-                    unsigned char* finalzonemapdata = new unsigned char[zonemapdatasize];
                     const Shape& fillshape = charset.shapes[zone.fill];
                     memset(zonemapdata, charset.shapeblocks[0][0], zonemapdatasize);
-                    memset(finalzonemapdata, charset.shapeblocks[0][0], zonemapdatasize);
                     for (int y = 0; y < zone.sy; y += fillshape.sy/2)
                     {
                         for (int x = 0; x < zone.sx; x += fillshape.sx/2)
@@ -4749,23 +4779,36 @@ void savealldata()
                         }
                     }
 
-                    // Interleave
-                    for (int y = 0; y < zone.sy; ++y)
+                    zoneheaders.push_back(zone.sx);
+                    zoneheaders.push_back(zone.sy);
+                    zoneheaders.push_back(zone.bg1);
+                    zoneheaders.push_back(zone.bg2);
+                    zoneheaders.push_back(zone.bg3);
+                    zoneheaders.push_back(zone.navareas.size() > 0 ? zone.navareas.size() - 1 : 0);
+                    zoneheaders.push_back(zone.charset);
+                    zoneheaders.push_back(zonedata.size() & 0xff);
+                    zoneheaders.push_back(zonedata.size() >> 8);
+
+                    packzone(zonemapdata, zonemapdatasize, zonedata);
+
+                    for (int c = 0; c < zone.navareas.size(); ++c)
                     {
-                        for (int x = 0; x < zone.sx; ++x)
-                            finalzonemapdata[(y&0xfe)*zone.sx+x*2+(y&1)] = zonemapdata[y*zone.sx+x];
+                        zonedata.push_back(zone.navareas[c].disabled ? 0xff : zone.navareas[c].type);
+                        zonedata.push_back(zone.navareas[c].l);
+                        zonedata.push_back(zone.navareas[c].r);
+                        zonedata.push_back(zone.navareas[c].u);
+                        zonedata.push_back(zone.navareas[c].d);
                     }
 
-                    std::vector<unsigned char> exodata = exomize(&finalzonemapdata[0], zonemapdatasize);
-
-                    packdata.push_back(exodata);
                     delete[] zonemapdata;
-                    delete[] finalzonemapdata;
-                    
-                    objectoffsets.push_back(datasize);
-                    datasize += headerdata.size();
-                    datasize += exodata.size();
                 }
+
+                // Figure out object offsets now
+                datasize = 4;
+                objectoffsets.push_back(datasize);
+                datasize += zoneheaders.size();
+                objectoffsets.push_back(datasize);
+                datasize += zonedata.size();
 
                 sprintf(ib2, "%s%02d.map", ib1, s);
                 handle = open(ib2, O_RDWR|O_BINARY|O_TRUNC|O_CREAT, S_IREAD|S_IWRITE);
@@ -4773,14 +4816,11 @@ void savealldata()
                 {
                     write8(handle, datasize&0xff);
                     write8(handle, datasize>>8);
-                    write8(handle, packdata.size());
+                    write8(handle, objectoffsets.size());
                     for (int z = 0; z < objectoffsets.size(); ++z)
                         writele16(handle, objectoffsets[z]);
-                    for (int z = 0; z < packdata.size(); ++z)
-                    {
-                        write(handle, &zoneheaders[z][0], zoneheaders[z].size());
-                        write(handle, &packdata[z][0], packdata[z].size());
-                    }
+                    write(handle, &zoneheaders[0], zoneheaders.size());
+                    write(handle, &zonedata[0], zonedata.size());
                     close(handle);
                 }
             }
@@ -4796,21 +4836,91 @@ void savealldata()
                 fprintf(out, "LEVELACTBITSIZE = %d\n", totalactorbitsize);
                 fprintf(out, "LEVELOBJBITSIZE = %d\n", totalobjectbitsize);
                 fprintf(out, "ZONEBITSIZE = %d\n", (totalzones+7)/8);
+                fclose(out);
+            }
+            sprintf(ib2, "%sdata.s", ib1);
+            out = fopen(ib2, "wt");
+            if (out)
+            {
                 fprintf(out, "\nlvlActBitStart:\n");
                 for (int c = 0; c < maxusedlevel+1; c++)
-                {
                     fprintf(out, "                dc.b %d\n", infos[c].actorbitstart);
-                }
                 fprintf(out, "                dc.b %d\n", totalactorbitsize);
 
                 fprintf(out, "\nlvlObjBitStart:\n");
                 for (int c = 0; c < maxusedlevel+1; c++)
-                {
                     fprintf(out, "                dc.b %d\n", infos[c].objectbitstart+totalactorbitsize);
-                }
                 fprintf(out, "                dc.b %d\n", totalobjectbitsize+totalactorbitsize);
 
                 fclose(out);
+            }
+
+            // Build global actor data
+            sprintf(ib2, "%sglobal.s", ib1);
+            out = fopen(ib2, "wt");
+            if (out)
+            {
+                unsigned char saveactx[MAXGLOBALACT];
+                unsigned char saveacty[MAXGLOBALACT];
+                unsigned char saveactz[MAXGLOBALACT];
+                unsigned char saveactt[MAXGLOBALACT];
+                unsigned char saveactwpn[MAXGLOBALACT];
+                unsigned char saveactorg[MAXGLOBALACT];
+                
+                for (int c = 0; c < MAXGLOBALACT; ++c)
+                {
+                    saveactx[c] = 0;
+                    saveacty[c] = 0;
+                    saveactz[c] = 0;
+                    saveactt[c] = 0;
+                    saveactwpn[c] = 0;
+                    saveactorg[c] = 0;
+                }
+                
+                int used = 0;
+                for (int c = 0; c < NUMLVLACT; ++c)
+                {
+                    if (actors[c].t)
+                    {
+                        const Actor& actor = actors[c];
+                        if (actor.flags & 2)
+                        {
+                            int z = findzone(actor.x, actor.y);
+                            if (z >= 0)
+                            {
+                                Zone& zone = zones[z];
+                                saveactx[used] = actor.x - zone.x;
+                                saveacty[used] = actor.y - zone.y;
+                                saveactz[used] = zone.id;
+                                saveactt[used] = actor.t;
+                                saveactwpn[used] = actor.data;
+                                saveactorg[used] = 0x40 | zone.level;
+                                if (actor.flags & 1)
+                                    saveacty[used] |= 0x80; // Hide flag
+                                ++used;
+                            }
+                        }
+                    }
+                }
+                fprintf(out, "\nglobalActX:\n");
+                for (int c = 0; c < MAXGLOBALACT; c++)
+                    fprintf(out, "                dc.b $%02x\n", saveactx[c]);
+                fprintf(out, "\nglobalActY:\n");
+                for (int c = 0; c < MAXGLOBALACT; c++)
+                    fprintf(out, "                dc.b $%02x\n", saveacty[c]);
+                fprintf(out, "\nglobalActZ:\n");
+                for (int c = 0; c < MAXGLOBALACT; c++)
+                    fprintf(out, "                dc.b $%02x\n", saveactz[c]);
+                fprintf(out, "\nglobalActT:\n");
+                for (int c = 0; c < MAXGLOBALACT; c++)
+                    fprintf(out, "                dc.b $%02x\n", saveactt[c]);
+                fprintf(out, "                dc.b $00\n"); // Extra for endmark
+                fprintf(out, "\nglobalActWpn:\n");
+                for (int c = 0; c < MAXGLOBALACT; c++)
+                    fprintf(out, "                dc.b $%02x\n", saveactwpn[c]);
+                fprintf(out, "\nglobalActOrg:\n");
+                for (int c = 0; c < MAXGLOBALACT; c++)
+                    fprintf(out, "                dc.b $%02x\n", saveactorg[c]);
             }
 
             return;
@@ -4896,7 +5006,7 @@ void loadalldata()
                             tile.s = read8(handle);
                         }
                         zone.navareasdirty = true;
-                        
+
                         int numnavareas = read8(handle);
                         zone.navareas.resize(numnavareas);
                         for (int n = 0; n < numnavareas; ++n)
@@ -4955,70 +5065,96 @@ void loadalldata()
     }
 }
 
-std::vector<unsigned char> exomize(unsigned char* data, int datasize)
+void findrle(unsigned char* data, int pos, int length, unsigned char& rlebyte, int& rlelen)
 {
-    int exosrchandle, exodesthandle;
-
-    exosrchandle = open("temp.bin", O_RDWR|O_BINARY|O_TRUNC|O_CREAT, S_IREAD|S_IWRITE);
-    write(exosrchandle, data, datasize);
-    close(exosrchandle);
-
-    system("exomizer3 raw -T4 -M256 -c -otemp.pak temp.bin");
-    exodesthandle = open("temp.pak", O_RDONLY|O_BINARY, S_IREAD);
-
-    std::vector<unsigned char> ret;
-
-    if (exodesthandle != -1)
+    rlelen = 0;
+    for (;;)
     {
-        int packedsize = lseek(exodesthandle, 0, SEEK_END);
-        lseek(exodesthandle, 0, SEEK_SET);
-        ret.resize(packedsize);
-        if (packedsize > 0)
-            read(exodesthandle, &ret[0], packedsize);
-        close(exodesthandle);
+        if (data[rlelen+pos] == data[pos] && rlelen < MAXSEQ)
+            ++rlelen;
+        else
+            break;
     }
-    unlink("temp.bin");
-    unlink("temp.pak");
-    return ret;
+
+    if (rlelen >= MINSEQ)
+        rlebyte = data[pos];
+    else
+        rlelen = -1;
 }
 
-std::vector<unsigned char> rlepack(unsigned char* data, int datasize)
+void findsequence(unsigned char* data, int pos, int length, int& seqofs, int& seqlen)
 {
-    int emittedpos = 0;
-    int pos = 0;
-    std::vector<unsigned char> ret;
+    int bestofs = -1;
+    int bestlen = -1;
 
-    while (pos < datasize)
+    for (int ofs = pos-MINSEQ; ofs >= 0; --ofs)
     {
-        int seqlength = 1;
-        for (int seqpos = pos + 1; seqpos < datasize && seqpos - pos < 255; ++seqpos)
+        int len = 0;
+        if (data[ofs] == data[pos])
         {
-            if (data[seqpos] == data[pos])
-                ++seqlength;
-            else
-                break;
+            len = 1;
+            for (;;)
+            {
+                if (ofs+len < pos && len < MAXSEQ && data[ofs+len] == data[pos+len])
+                    ++len;
+                else
+                    break;
+            }
         }
-        if (seqlength >= 4)
+        if (len >= MINSEQ && len > bestlen && len <= MAXSEQ && (pos-ofs) < MAXOFS)
         {
-            while (emittedpos < pos)
-                ret.push_back(data[emittedpos++]);
-            ret.push_back(0xff);
-            ret.push_back(seqlength);
-            ret.push_back(data[pos]);
-            pos += seqlength;
-            emittedpos = pos;
+            bestlen = len;
+            bestofs = ofs;
+        }
+    }
+
+    seqofs = bestofs;
+    seqlen = bestlen;
+}
+
+void packzone(unsigned char* data, int length, std::vector<unsigned char>& outdata)
+{
+    int sizebegin = outdata.size();
+
+    for (int pos = 0; pos < length;)
+    {
+        int currrle = -1, currseq = -1, nextseq = -1, currofs, nextofs;
+        unsigned char rlebyte;
+        
+        findsequence(data, pos, length, currofs, currseq);
+        findsequence(data, pos+1, length, nextofs, nextseq);
+        findrle(data, pos, length, rlebyte, currrle);
+        if (nextseq >= 0 && nextseq > currseq + 1 && nextseq > currrle + 1)
+        {
+            currseq = -1;
+            currrle = -1;
+        }
+        if (currseq < 0 && currrle < 0)
+        {
+            if (data[pos] < ESCAPE)
+                outdata.push_back(data[pos]);
+            else
+            {
+                outdata.push_back(ESCAPE+1);
+                outdata.push_back(data[pos]);
+            }
+            ++pos;
+        }
+        else if (currseq > currrle)
+        {
+            outdata.push_back(ESCAPE+RANGE+currseq-MINSEQ+2);
+            // Store relative offset for better Exomizer compression, though depack algorithm uses absolute (ringbuffer)
+            outdata.push_back(pos-currofs);
+            pos += currseq;
         }
         else
         {
-            ++pos;
+            outdata.push_back(ESCAPE+currrle-MINSEQ+2);
+            outdata.push_back(rlebyte);
+            pos += currrle;
         }
     }
-    while (emittedpos < pos)
-        ret.push_back(data[emittedpos++]);
-    ret.push_back(0xff); // Endmark
-    ret.push_back(0);
-
-    return ret;
+    outdata.push_back(ESCAPE);
 }
 
 void exportpng()
@@ -5372,7 +5508,7 @@ void packcharset(int index)
             }
         }
     }
-    
+
     // Draw each zone using the charset to colorbuffer to determine which blocks can use optimization
     ColorBuffer cbuf;
     for (int c = 0; c < NUMBLOCKS; ++c)
@@ -5436,6 +5572,142 @@ void packcharset(int index)
     }
 
     charset.dirty = false;
+}
+
+bool compareshapeblockuse(const ShapeBlockUse& a, const ShapeBlockUse& b)
+{
+    return a.usecount > b.usecount;
+}
+
+bool compareshapeblocksortkey(const ShapeBlockUse& a, const ShapeBlockUse& b)
+{
+    return a.sortkey < b.sortkey;
+}
+
+void reorderblocks(int index)
+{
+    Charset& charset = charsets[index];
+    std::vector<ShapeBlockUse> shapeblockuse;
+    shapeblockuse.resize(NUMBLOCKS);
+    for (int c = 0; c < NUMBLOCKS; ++c)
+    {
+        shapeblockuse[c].num = c;
+        shapeblockuse[c].usecount = 0;
+        shapeblockuse[c].sortkey =
+            ((unsigned)charset.blockdata[c] << 24) |
+            ((unsigned)charset.blockdata[c+256] << 16) |
+            ((unsigned)charset.blockdata[c+512] << 8) |
+            ((unsigned)charset.blockdata[c+768]);
+    }
+
+    for (int z = 0; z < NUMZONES; ++z)
+    {
+        const Zone& zone = zones[z];
+        if (!zone.sx || !zone.sy || zone.charset != index)
+            continue;
+
+        ColorBuffer cbuf;
+        drawzonetobuffer(cbuf, zone);
+
+        int zonemapdatasize = zone.sx * (zone.sy+1); // One extra row for shake effect
+        unsigned char* zonemapdata = new unsigned char[zonemapdatasize];
+        const Shape& fillshape = charset.shapes[zone.fill];
+        memset(zonemapdata, charset.shapeblocks[0][0], zonemapdatasize);
+        for (int y = 0; y < zone.sy; y += fillshape.sy/2)
+        {
+            for (int x = 0; x < zone.sx; x += fillshape.sx/2)
+                drawc64shape(x, y, zone.fill, zone, charset, zonemapdata);
+        }
+    
+        for (int t = 0; t < zone.tiles.size(); ++t)
+            drawc64shape(zone.tiles[t].x, zone.tiles[t].y, zone.tiles[t].s, zone, charset, zonemapdata);
+    
+        // Change blocks to with-color variations as necessary
+        for (int y = 0; y < zone.sy; ++y)
+        {
+            for (int x = 0; x < zone.sx; ++x)
+            {
+                unsigned char blocknum = zonemapdata[y*zone.sx+x];
+                if (charset.optblocknum[blocknum] >= 0 && checkuseoptimize(cbuf, x, y, zone, false))
+                    zonemapdata[y*zone.sx+x] = charset.optblocknum[blocknum];
+            }
+        }
+        
+        // Count block use
+        for (int c = 0; c < zonemapdatasize; ++c)
+            ++shapeblockuse[zonemapdata[c]].usecount;
+    }
+
+    std::sort(shapeblockuse.begin(), shapeblockuse.end(), compareshapeblockuse);
+    //printf("Use results for charset %d\n", index);
+
+    // Now sort the literals and escape-literal parts separately so that charset compresses best
+    // The blocks below the escape-literal threshold are sorted separately for blocks that are used on map
+    // and those that are not used (block animation frames)
+    int zerousethreshold = NUMBLOCKS;
+    for (int c = 0; c < NUMBLOCKS; ++c)
+    {
+        if (shapeblockuse[c].usecount == 0)
+        {
+            zerousethreshold = c;
+            break;
+        }
+    }
+
+    std::sort(shapeblockuse.begin(), shapeblockuse.end() - 2*RANGE, compareshapeblocksortkey);
+    if (zerousethreshold <= NUMBLOCKS - 2*RANGE || zerousethreshold >= NUMBLOCKS)
+        std::sort(shapeblockuse.end() - 2*RANGE, shapeblockuse.end(), compareshapeblocksortkey);
+    else
+    {
+        std::sort(shapeblockuse.end() - 2*RANGE, shapeblockuse.begin() + zerousethreshold, compareshapeblocksortkey);
+        std::sort(shapeblockuse.begin() + zerousethreshold, shapeblockuse.end(), compareshapeblocksortkey);
+    }
+
+    std::map<unsigned char, unsigned char> oldtonew;
+    std::map<unsigned char, unsigned char> newtoold;
+    for (int c = 0; c < shapeblockuse.size(); ++c)
+    {
+        oldtonew[shapeblockuse[c].num] = c;
+        newtoold[c] = shapeblockuse[c].num;
+        //printf("Block %d use %d, map to %d\n", shapeblockuse[c].num, shapeblockuse[c].usecount, c);
+    }
+
+    unsigned char newblockcolors[NUMBLOCKS];
+    unsigned char newblockdata[NUMBLOCKS*BLOCKDATASIZE];
+    unsigned char newblockinfos[NUMBLOCKS];
+    unsigned char newshapeblocks[NUMSHAPES][MAXSHAPEBLOCKSIZE*MAXSHAPEBLOCKSIZE];
+    int newoptblocknum[NUMBLOCKS];
+    for (int c = 0; c < NUMBLOCKS; ++c)
+        newoptblocknum[c] = -1;
+
+    for (int c = 0; c < NUMBLOCKS; ++c)
+    {
+        newblockcolors[c] = charset.blockcolors[newtoold[c]];
+        newblockdata[c] = charset.blockdata[newtoold[c]];
+        newblockdata[c+256] = charset.blockdata[newtoold[c]+256];
+        newblockdata[c+512] = charset.blockdata[newtoold[c]+512];
+        newblockdata[c+768] = charset.blockdata[newtoold[c]+768];
+        newblockinfos[c] = charset.blockinfos[newtoold[c]];
+        if (charset.optblocknum[newtoold[c]] >= 0)
+            newoptblocknum[c] = oldtonew[charset.optblocknum[newtoold[c]]];
+    }
+
+    for (int s = 0; s < NUMSHAPES; ++s)
+    {
+        Shape& shape = charset.shapes[s];
+
+        for (int cy = 0; cy < shape.sy/2; ++cy)
+        {
+            for (int cx = 0; cx < shape.sx/2; ++cx)
+                newshapeblocks[s][cy*MAXSHAPEBLOCKSIZE+cx] = oldtonew[charset.shapeblocks[s][cy*MAXSHAPEBLOCKSIZE+cx]];
+        }
+    }
+
+    memcpy(charset.blockcolors, newblockcolors, sizeof charset.blockcolors);
+    memcpy(charset.blockdata, newblockdata, sizeof charset.blockdata);
+    memcpy(charset.blockinfos, newblockinfos, sizeof charset.blockinfos);
+    memcpy(charset.shapeblocks, newshapeblocks, sizeof charset.shapeblocks);
+    memcpy(charset.optblocknum, newoptblocknum, sizeof charset.optblocknum);
 }
 
 void drawc64shape(int x, int y, unsigned char num, const Zone& zone, const Charset& charset, unsigned char* dest)
@@ -5602,6 +5874,7 @@ void updatenavareas(Zone& zone)
                 zone.navareas.resize(idx+1);
 
             unsigned char bi = cbuf.blockinfos[y*zone.sx+x];
+            unsigned char ibi = bi;
             if ((bi & 0x7) == 0x4) // Ladder without ground
             {
                 NavArea& area = zone.navareas[idx];
@@ -5636,8 +5909,8 @@ void updatenavareas(Zone& zone)
                     else
                         break;
                 }
-                // Skip one-block ledges (ie. streetlamps)
-                if (area.r - area.l > 1)
+                // Skip one-block ledges (ie. streetlamps), unless it's solid
+                if (area.r - area.l > 1 || (ibi & 0x2))
                     ++idx;
             }
             else if ((bi & 0x81) == 1 && (bi & 0x60) != 0 && (bi & 0x60) != 0x40) // Up-right slope
@@ -5649,22 +5922,29 @@ void updatenavareas(Zone& zone)
                 area.r = x+1;
                 area.d = y+1;
                 int y2 = y;
+                unsigned char lbi = bi;
                 for (int x2 = x; x2 >= 0; --x2)
                 {
                     bi = cbuf.blockinfos[y2*zone.sx+x2];
                     unsigned char bi2 = (y2 < zone.sy-1) ? cbuf.blockinfos[(y2+1)*zone.sx+x2] : 0x2;
                     if ((bi & 0x81) == 1 && (bi & 0x60) != 0)
+                    {
                         area.l = x2;
+                        lbi = bi;
+                    }
                     else if ((bi2 & 0x81) == 1 && (bi2 & 0x60) != 0)
                     {
                         ++y2;
                         area.l = x2;
                         area.d = y2+1;
+                        lbi = bi2;
                     }
                     else
                         break;
                 }
-                ++idx;
+                // Last block must touch the ground
+                if (lbi & 0x20)
+                    ++idx;
             }
             else if ((bi & 0x81) == 0x81 && (bi & 0x60) != 0) // Up-left slope
             {
@@ -5675,22 +5955,29 @@ void updatenavareas(Zone& zone)
                 area.r = x+1;
                 area.d = y+1;
                 int y2 = y;
+                unsigned char lbi = bi;
                 for (int x2 = x; x2 < zone.sx; ++x2)
                 {
                     bi = cbuf.blockinfos[y2*zone.sx+x2];
                     unsigned char bi2 = (y2 < zone.sy-1) ? cbuf.blockinfos[(y2+1)*zone.sx+x2] : 0x2;
                     if ((bi & 0x81) == 0x81 && (bi & 0x60) != 0)
+                    {
                         area.r = x2+1;
+                        lbi = bi;
+                    }
                     else if ((bi2 & 0x81) == 0x81 && (bi2 & 0x60) != 0)
                     {
                         ++y2;
                         area.r = x2+1;
                         area.d = y2+1;
+                        lbi = bi2;
                     }
                     else
                         break;
                 }
-                ++idx;
+                // Last block must touch the ground
+                if (lbi & 0x20)
+                    ++idx;
             }
         }
     }

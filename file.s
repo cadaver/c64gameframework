@@ -20,7 +20,7 @@ LF_NoError:     rts
         ; Returns: loadRes chunk file number, zpDestLo-Hi file address, zpSrcLo-Hi object address (hi also in A)
         ; Modifies: A,X,Y,loader temp vars,resource load vars
 
-GetZoneObject:  lda zoneNum
+GetLevelResourceObject:
                 ldy #C_LEVEL
                 bpl GetResourceObject
 
@@ -77,35 +77,10 @@ LF_AgeSkip:     inx
                 jsr PurgeUntilFree
                 lda freeMemLo
                 ldx freeMemHi
-                ldy loadRes                     ;Level chunk is an exception: uncompressed data
-                bne LF_IsCompressed
-
-LF_Uncompressed:sta zpDestLo
-                stx zpDestHi
-                lda dataSizeHi
-                sta zpBitsHi
-                ldx dataSizeLo
-                beq LF_UncompressedPredecrement
-LF_UncompressedLoop:
-                jsr GetByte
-LF_UncompressedStore:
-                sta (zpDestLo),y
-                iny
-                bne LF_UncompressedNoDestHi
-                inc zpDestHi
-LF_UncompressedNoDestHi:
-                dex
-                bne LF_UncompressedLoop
-LF_UncompressedPredecrement:
-                dec zpBitsHi
-                bpl LF_UncompressedLoop
-                bmi LF_UncompressedDone
-
-LF_IsCompressed:jsr LoadFile
+                jsr LoadFile
 
         ; Finish loading, relocate chunk object pointers
 
-LF_UncompressedDone:
                 ldy loadRes
                 lda freeMemLo                   ;Increment free mem pointer
                 sta zpBitsLo
@@ -394,35 +369,4 @@ CM_NotOver:     dex
                 bne CM_Loop
 CM_Predecrement:dec zpBitsHi
                 bpl CM_Loop
-                rts
-
-        ; Depack Exomizer packed data from memory
-        ;
-        ; Parameters: A,X destination, zpSrcLo,Hi source
-        ; Returns: C=0
-        ; Modifies: A,X,Y,loader temp vars
-
-DepackFromMemory:
-                ldy zpSrcLo
-                sty DFM_GetByte+1
-                ldy zpSrcHi
-                sty DFM_GetByte+2
-                sta zpDestLo
-                stx zpDestHi
-                jsr SwitchGetByte
-                jsr Depack
-SwitchGetByte:  ldx #$02
-SWG_Loop:       lda GetByte,x
-                eor getByteJump,x               ;Swap normal getbyte & from-memory getbyte
-                sta GetByte,x
-                dex
-                bpl SWG_Loop
-                rts
-
-DFM_GetByte:    lda $1000
-                inc DFM_GetByte+1
-                bne DFM_GetByteNoHigh
-                inc DFM_GetByte+2
-DFM_GetByteNoHigh:
-                clc
                 rts

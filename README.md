@@ -185,6 +185,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 - 3 4 Edit actor databyte fast
 - 5 6 Edit actor type
 - D Toggle actor dir left/right / toggle object autodeactivation
+- G Toggle actor global flag. Global actors are not stored in leveldata but in the source file worldglobal.s (max. 32 currently)
 - H Toggle actor hidden flag
 - F Edit object animation frame count
 - M Edit object activation mode

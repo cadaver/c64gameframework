@@ -47,10 +47,10 @@ music00.pak: music/example.sng
 	dasm music00.s -omusic00.prg -p3
 	exomizer3 level -M256 -f -c -omusic00.pak music00.prg
 
-level00.pak: bg/world00.map bg/world00.lvo bg/world00.lva level00.s
-	dasm level00.s -olevel00.bin -f3
+level00.pak: bg/world00.map bg/world00.lvo bg/world00.lva
+	pchunk3 bg/world00.map level00map.pak
 	pack3 level00.bin level00data.pak
-	filejoin bg/world00.map+level00data.pak level00.pak
+	filejoin level00map.pak+level00data.pak level00.pak
 
 charset00.pak: charset00.s mainsym.s memory.s bg/world00.blk bg/world00.bli bg/world00.chr bg/world00.oba
 	dasm charset00.s -ocharset00.bin -f3

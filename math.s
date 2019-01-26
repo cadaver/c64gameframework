@@ -4,6 +4,8 @@
         ; Returns: zeropage result
         ; Modifies: A
 
+GetNext2MapRows:jsr AddMapSizeX
+AddMapSizeX:    lda mapSizeX
 Add8:           clc
                 adc $00,x
                 sta $00,x

@@ -1,10 +1,17 @@
-ZONEH_CHARSET   = 0
-ZONEH_SIZEX     = 1
-ZONEH_SIZEY     = 2
-ZONEH_BG1       = 3
-ZONEH_BG2       = 4
-ZONEH_BG3       = 5
-ZONEH_NAVAREAS  = 6
+OBJ_ZONEHEADERS = 0
+OBJ_ZONEDATA    = 1
+
+ZONEHEADERSIZE  = 9
+
+ZONEH_SIZEX     = 0
+ZONEH_SIZEY     = 1
+ZONEH_BG1       = 2
+ZONEH_BG2       = 3
+ZONEH_BG3       = 4
+ZONEH_LASTNAVAREA = 5
+ZONEH_CHARSET   = 6
+ZONEH_MAPOFFSETLO = 7
+ZONEH_MAPOFFSETHI = 8
 
 SCREENSIZEX     = 19
 SCREENSIZEY     = 11
@@ -34,6 +41,11 @@ AUTODEACT_DELAY = 10
 NO_OBJECT       = $ff
 NO_SCRIPT       = $ff
 NO_LEVEL        = $ff
+
+MINSEQ          = 3
+MAXSEQ          = 24
+RANGE           = MAXSEQ
+ESCAPE          = (256-(2*RANGE))
 
         ; Get address of save var
         ;
@@ -257,11 +269,22 @@ CL_SavedActorsDone:
         ; Modifies: A,X,Y,loader temp vars,temp vars
 
 ChangeZone:     sta zoneNum
-                jsr GetZoneObject
-                ldy #ZONEH_CHARSET
-                lda (zpSrcLo),y                 ;Get charset to load
+                ldy #ZONEHEADERSIZE
+                ldx #<zpBitsLo
+                jsr MulU                        ;Calculate zone header start offset
+                lda #OBJ_ZONEHEADERS            ;Get the zone headers baseaddress
+                jsr GetLevelResourceObject
+                ldy #<zpSrcLo
+                jsr Add16                       ;Add baseaddress to get zone ptr
+                ldy #ZONEHEADERSIZE-1
+CZ_CopyZoneHeader:
+                lda (zpBitsLo),y                ;Copy all zone header vars to zeropage
+                sta mapSizeX,y
+                dey
+                bpl CZ_CopyZoneHeader
+                lda zoneCharset
 CZ_LoadedCharset:
-                cmp #$ff                        ;Finally load charset if required
+                cmp #$ff
                 beq CZ_SameCharset
                 sta CZ_LoadedCharset+1
                 ldx #F_CHARSET
@@ -269,89 +292,10 @@ CZ_LoadedCharset:
                 lda #<blkTL
                 ldx #>blkTL
                 jsr LoadFile
-CZ_SameCharset: jsr GetZoneObject
-                ldy #ZONEH_SIZEX
-                lda (zpSrcLo),y
-                sta mapSizeX
-                sec
-                sbc #SCREENSIZEX
-                sta SL_MapXLimit+1             ;Calculate limits for scrolling
-                sta UF_MapXLimit+1
-                iny
-                lda (zpSrcLo),y
-                sta mapSizeY
-                sec
-                sbc #SCREENSIZEY
-                sta SL_MapYLimit+1
-                sta UF_MapYLimit+1
-                ldy #ZONEH_NAVAREAS
-                ldx #$00
-CZ_GetNavAreas: lda (zpSrcLo),y                 ;Get zone's navareas to dedicated data structure
-                beq CZ_NavAreasDone             ;These are followed by packed zone data
-                sta navAreaType,x
-                iny
-                lda (zpSrcLo),y
-                sta navAreaL,x
-                iny
-                lda (zpSrcLo),y
-                sta navAreaR,x
-                iny
-                lda (zpSrcLo),y
-                sta navAreaU,x
-                iny
-                lda (zpSrcLo),y
-                sta navAreaD,x
-                iny
-                stx lastNavArea
-                inx
-                bne CZ_GetNavAreas
-CZ_NavAreasDone:iny
-                tya
-                ldx #<zpSrcLo
-                jsr Add8                        ;Get zone packed data start address to zpSrcLo,Hi
-                ldy mapSizeY                    ;Map data must be even amount of rows + one extra for shake effect
-                iny
-                tya
-                lsr
-                bcc CZ_EvenSize
-                iny
-CZ_EvenSize:    lda mapSizeX
-                ldx #<zoneBufferLo
-                jsr MulU
-                lda musicDataLo
-                sec
-                sbc zoneBufferLo
-                sta zoneBufferLo
-                lda musicDataHi
-                sbc zoneBufferHi
-                sta zoneBufferHi
-                jsr PurgeUntilFreeNoNew         ;Purge files until there's room for the zone
-                lda zoneBufferLo
-                sta mapPtrLo
-                ldx zoneBufferHi
-                stx mapPtrHi
-                jsr DepackFromMemory            ;Depack now
-                ldy #$00                        ;Write map row table
-                ldx #<mapPtrLo
-CZ_InitMapTbl:  lda mapPtrLo
-                sta mapTblLo,y
-                ;clc                            ;C=0 after DepackFromMemory
-                adc #$01
-                sta mapTblLo+1,y
-                lda mapPtrHi
-                sta mapTblHi,y
-                adc #$00
-                sta mapTblHi+1,y
-                lda mapSizeX
-                jsr Add8
-                lda mapSizeX
-                jsr Add8
-                iny
-                iny
-                cpy #MAX_MAPROWS                ;Always write the whole table for simplicity
-                bcc CZ_InitMapTbl
+CZ_SameCharset:
                 ldy #MAX_LVLOBJ-1               ;Find levelobjects in zone
                 ldx #$00
+                stx actNavArea+ACTI_PLAYER      ;Reset player's navarea to make sure is not referring to an illegal one
 CZ_FindLevelObjects:
                 lda lvlObjZ,y
                 cmp zoneNum
@@ -363,10 +307,117 @@ CZ_FLONext:     dey
                 bpl CZ_FindLevelObjects
                 lda #NO_OBJECT
                 sta zoneLvlObjList,x            ;Endmark
+                lda mapSizeX
+                sec
+                sbc #SCREENSIZEX
+                sta SL_MapXLimit+1              ;Calculate limits for scrolling
+                sta UF_MapXLimit+1
+                lda mapSizeY
+                tay
+                sbc #SCREENSIZEY                ;C=1
+                sta SL_MapYLimit+1
+                sta UF_MapYLimit+1
+                iny                             ;Map data must be an even amount of rows + one extra for shake effect
+                tya
+                lsr
+                bcc CZ_EvenSize
+                iny
+CZ_EvenSize:    lda mapSizeX
+                ldx #<zoneBufferLo
+                jsr MulU
+                lda musicDataLo                 ;Calculate zone mapdata start
+                sec
+                sbc zoneBufferLo
+                sta zoneBufferLo
+                lda musicDataHi
+                sbc zoneBufferHi
+                sta zoneBufferHi
+                jsr PurgeUntilFreeNoNew         ;Purge files until there's room for the zone mapdata
+                lda zoneBufferLo
+                sta zpSrcLo
+                lda zoneBufferHi
+                sta zpSrcHi
+                clc
+                ldy #$00
+                ldx #<zpSrcLo
+CZ_MapRowLoop:  lda zpSrcLo
+                sta mapTblLo,y
+                adc #$01
+                sta mapTblLo+1,y
+                lda zpSrcHi
+                sta mapTblHi,y
+                adc #$00
+                sta mapTblHi+1,y
+                jsr GetNext2MapRows
+                iny
+                iny
+                cpy #MAX_MAPROWS                ;For simplicity, always input the whole maprowtable
+                bcc CZ_MapRowLoop
+                lda #OBJ_ZONEDATA               ;Get the zone packed datas baseaddress
+                jsr GetLevelResourceObject
+                ldx #<zpSrcLo                   ;zpSrcLo,Hi = current zone's packed data start
+                ldy #<zoneDataOffsetLo
+                jsr Add16
+                ldy #$00                        ;Src.index
+                sty yLo                         ;Row number
+                sty CZ_SequenceSta+1
+                jsr CZ_NextRow
+CZ_DepackZone:  lda (zpSrcLo),y
+                iny
+                bne CZ_InputNoMSB
+                inc zpSrcHi
+CZ_InputNoMSB:  cmp #ESCAPE
+                bcc CZ_Literal
+                beq CZ_DepackDone
+                cmp #ESCAPE+2
+                sta zpLenLo
+                lda (zpSrcLo),y
+                iny
+                bne CZ_InputNoMSB2
+                inc zpSrcHi
+CZ_InputNoMSB2: bcs CZ_SequenceOrRLE            ;Escaped literal or actual sequence?
+CZ_Literal:     jsr CZ_OutputByte
+                bne CZ_DepackZone
+CZ_SequenceOrRLE:
+                pha                             ;Offset or literal byte to repeat
+                lda zpLenLo
+                sbc #ESCAPE                     ;C=1
+                sta zpLenLo                     ;Length of RLE
+                sbc #RANGE
+                bcc CZ_SkipLength
+                sta zpLenLo                     ;Length of sequence
+CZ_SkipLength:  pla
+                bcc CZ_UseRLE                   ;Store first RLE byte
+                eor #$ff                        ;Add current pos to get ringbuffer offset
+                adc CZ_SequenceSta+1            ;Is stored negative to get slightly better Exomizer compression
+                sec
+                sta CZ_SequenceLda+1
+CZ_SequenceLoop:bcc CZ_UseRLE
+CZ_SequenceLda: lda screen
+                inc CZ_SequenceLda+1
+CZ_UseRLE:      jsr CZ_OutputByte
+                dec zpLenLo
+                bpl CZ_SequenceLoop
+                bmi CZ_DepackZone
+CZ_DepackDone:  lda lastNavArea
+CZ_CopyNavAreas:tax
+                lda (zpSrcLo),y                 ;Copy navarea data stored after zone map
+                iny                             ;Note: order will be reversed, but it doesn't matter
+                bne CZ_CopyNavAreasNoMSB
+                inc zpSrcHi
+CZ_CopyNavAreasNoMSB:
+                sta navAreaType,x
+                txa
+                clc
+                adc #MAX_NAVAREAS               ;Move to next var
+                cmp #MAX_NAVAREAS*5
+                bcc CZ_CopyNavAreas
+                sbc #MAX_NAVAREAS*5+1           ;Move to next navarea after all vars
+                bpl CZ_CopyNavAreas
                 lda #<zoneLvlObjList
                 sta CZ_AnimLevelObjects+1
 CZ_AnimLevelObjects:
-                ldy zoneLvlObjList
+                ldy zoneLvlObjList              ;Animate level objects now
                 bmi CZ_AnimLevelObjectsDone
                 inc CZ_AnimLevelObjects+1
                 lda lvlObjFlags,y
@@ -383,6 +434,35 @@ CZ_AnimLevelObjectsDone:
                 sty usableObj
                 sty SLO_LastX+1                 ;Reset levelobject search (enough to reset X, since it can never be $ff)
                 rts
+
+        ; Output map byte in an interleaved manner while depacking zone
+        ;
+        ; Parameters: A byte, X output index, xLo pos within row-counter, yLo row counter
+        ; Returns: X incremented, Z=0
+        ; Modifies: X
+
+CZ_OutputByte:
+CZ_Sta:         sta $1000,x
+CZ_SequenceSta: sta screen                      ;Save also to screen as non-interleaved (sequence ringbuffer)
+                inc CZ_SequenceSta+1
+                inx
+                inx
+                bne CZ_OutputNoMSB
+                inc CZ_Sta+2
+CZ_OutputNoMSB: dec xLo
+                bne CZ_NoNextRow
+CZ_NextRow:     pha
+                ldx yLo
+                lda mapTblLo,x
+                sta CZ_Sta+1
+                lda mapTblHi,x
+                sta CZ_Sta+2
+                lda mapSizeX
+                sta xLo
+                pla
+                ldx #$00
+                inc yLo
+CZ_NoNextRow:   rts
 
         ; Place actor at the center of a levelobject
         ;

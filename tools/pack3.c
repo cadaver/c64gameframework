@@ -7,7 +7,7 @@ int main(int argc, char **argv)
   char cmd[256];
   if (argc < 3)
   {
-    printf("Invokes exomizer3 raw mode with max. length 256\nUsage: pack3 <infile> <outfile>\n");
+    printf("Invokes exomizer3 raw mode with max.seq.length 256\nUsage: pack3 <infile> <outfile>\n");
     return 1;
   }
 
