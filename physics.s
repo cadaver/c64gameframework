@@ -380,11 +380,11 @@ GBI_OutsideHoriz:
                 cmp #$fe
                 bcc GBI_OutsideRight
 GBI_OutsideLeft:lda #$00
-                skip2
+                beq GBI_OutsideHorizDone
 GBI_OutsideRight:
                 lda mapSizeX
                 sbc #$00
-                bcs GBI_OutsideHorizDone
+                bne GBI_OutsideHorizDone
 GBI_OutsideHorizNPC:
                 lda #BI_WALL
                 rts
