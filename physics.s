@@ -364,12 +364,12 @@ GBI_YNotOutside:lda mapTblLo,y
                 lda actXH,x
 GBI_Common2:    cmp mapSizeX
                 bcs GBI_OutsideHoriz
+GBI_OutsideHorizDone:
                 asl
                 bcc GBI_NoRowOverflow
                 inc zpSrcHi
 GBI_NoRowOverflow:
                 tay
-GBI_OutsideHorizExpandDone:
                 lda (zpSrcLo),y
                 tay
                 lda blkInfo,y
@@ -377,12 +377,14 @@ GBI_OutsideHorizExpandDone:
 GBI_OutsideHoriz:
                 cpx #MAX_COMPLEXACT             ;Bullets expand the edge column, NPCs get wall to not walk out of zone
                 bcc GBI_OutsideHorizNPC
-                ldy #$00
                 cmp #$fe
-                bcs GBI_OutsideHorizExpandDone  ;Left side
-                ldy mapSizeX
-                dey
-                bne GBI_OutsideHorizExpandDone  ;Right side
+                bcc GBI_OutsideRight
+GBI_OutsideLeft:lda #$00
+                skip2
+GBI_OutsideRight:
+                lda mapSizeX
+                sbc #$00
+                bcs GBI_OutsideHorizDone
 GBI_OutsideHorizNPC:
                 lda #BI_WALL
                 rts
