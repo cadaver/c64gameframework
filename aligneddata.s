@@ -13,13 +13,10 @@ flipNextSliceTbl:dc.b 24,1,2
 sprIrqAdvanceTbl:
                 dc.b -2,-3,-4,-5,-7,-8,-10,-11
 
-dsStartTbl:     dc.b 1,0
-                dc.b 41,40
-dsEndTbl:       if RIGHTCLIPPING = 1
-                dc.b 37,77
-                else
-                dc.b 38,78
-                endif
+dsStartTbl:     dc.b 1,2
+                dc.b 41,42
+
+dsEndTbl:       dc.b 37,77
 
                 org nextSliceTbl+21
                 dc.b 22,23,42
@@ -32,13 +29,15 @@ upperHalfJumpTblHi:
                 dc.b >DSRow0,>DSTopRow
 lowerHalfJumpTblLo:
                 dc.b <DSBottomRow, <DSRow6
+
                 dc.b 14
 lowerHalfJumpTblHi:
                 dc.b >DSBottomRow, >DSRow6
-dsOffsetTbl:    dc.b 0,1
-                dc.b 40,41
-                dc.b 0
+dsEdgeTbl:      dc.b 38,0
+                dc.b 78,40
 
+                dc.b 0
+                
                 org nextSliceTbl+42
                 dc.b 43,44,0
                 dc.b 0,43,44

@@ -5479,7 +5479,7 @@ void packcharset(int index)
                                             charset.blockcolors[search] = (blkcol & 0xf) | 0x80; // Color per block = blockcolor with high bit set
                                             // If block is empty and multicolor yellow, mark it with an illegal color (no colorwrite), but neighbour blocks with actual color cannot optimize themselves
                                             if (!sumchardata && blkcol == 0xf)
-                                                charset.blockcolors[search] = 0xff;
+                                                charset.blockcolors[search] = 0x7f;
                                         }
                                         break;
                                     }

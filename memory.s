@@ -113,6 +113,11 @@ zpLenHi         = zpBitsLo                      ;Exomizer 3 doesn't use zpBitsLo
                 var dsBlockX
                 var dsBlockY
                 var dsStartX
+                var dsEdgeX
+                var dsTopPtrLo
+                var dsTopPtrHi
+                var dsBottomPtrLo
+                var dsBottomPtrHi
 
                 var pattPtrLo                   ;Playroutine
                 var pattPtrHi

@@ -23,5 +23,4 @@ ACTI_LAST       = MAX_ACT-1
 
 SCROLLROWS      = 23
 USETURBOMODE    = 1                             ;Use C128 & SuperCPU turbo mode
-NTSCSIZEREDUCE  = 0                             ;Reduce scrolling area by 1 row on unaccelerated NTSC machines, disabled for now due to the example map layout
-RIGHTCLIPPING   = 0                             ;Use dedicated routines for drawing to screen right edge for less rastertime use
+

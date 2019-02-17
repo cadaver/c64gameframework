@@ -150,11 +150,8 @@ PBDLA_Skip:     pla
 PrintBCDDigit:  ora #$30
                 skip2
 PrintSpace:     lda #$20
-PrintPanelChar:
-PanelRowAccess1:
-                sta panelScreen+SCROLLROWS*40,x
+PrintPanelChar: sta panelScreen+SCROLLROWS*40,x
                 lda #$01
-PanelRowAccess2:
                 sta colors+SCROLLROWS*40,x
                 inx
                 rts

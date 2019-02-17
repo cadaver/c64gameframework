@@ -52,20 +52,20 @@ NEXT_EP         set NEXT_EP + 1
                 dc.b {1} | ({2} * 4) | ({3} * 16) | ({4} * 64)
                 endm
 
-        ; Screen update macros
+        ; Screen redraw macros
 
-                mac drawbottomleft
-                subroutine dbl
+                mac drawbottomedge
+                subroutine dbe
                 ldy $1000,x
                 lda blkColors,y
                 bne .1
-                lda blkBL,y
-                sta colors+{1}
+                lda (dsBottomPtrLo),y
+                sta colors+{1},x
                 bcc .3
-.1:             sta colors+{1}
-.2:             lda blkBL,y
-.3:             sta screen+{1}
-                subroutine dblend
+.1:             sta colors+{1},x
+.2:             lda (dsBottomPtrLo),y
+.3:             sta screen+{1},x
+                subroutine dbeend
                 endm
 
                 mac drawbottom
@@ -89,32 +89,18 @@ NEXT_EP         set NEXT_EP + 1
                 subroutine dbend
                 endm
 
-                mac drawbottomright
-                subroutine dbr
+                mac drawtopedge
+                subroutine dte
                 ldy $1000,x
                 lda blkColors,y
                 bne .1
-                lda blkBR,y
-                sta colors+{1}
+                lda (dsTopPtrLo),y
+                sta colors+{1},x
                 bcc .3
-.1:             sta colors+{1}
-.2:             lda blkBR,y
-.3:             sta screen+{1}
-                subroutine dbrend
-                endm
-
-                mac drawtopleft
-                subroutine dtl
-                ldy $1000,x
-                lda blkColors,y
-                bne .1
-                lda blkTL,y
-                sta colors+{1}
-                bcc .3
-.1:             sta colors+{1}
-.2:             lda blkTL,y
-.3:             sta screen+{1}
-                subroutine dtlend
+.1:             sta colors+{1},x
+.2:             lda (dsTopPtrLo),y
+.3:             sta screen+{1},x
+                subroutine dteend
                 endm
 
                 mac drawtop
@@ -138,60 +124,25 @@ NEXT_EP         set NEXT_EP + 1
                 subroutine dtend
                 endm
 
-                mac drawtopright
-                subroutine dtr
-                ldy $1000,x
-                lda blkColors,y
-                bne .1
-                lda blkTR,y
-                sta colors+{1}
-                bcc .3
-.1:             sta colors+{1}
-.2:             lda blkTR,y
-.3:             sta screen+{1}
-                subroutine dtrend
-                endm
-
-                mac drawleft
-                subroutine dl
+                mac drawedge
+                subroutine de
                 ldy $1000,x
                 lda blkColors,y
                 bmi .1
                 bne .2
-                lda blkTL,y
+                lda (dsTopPtrLo),y
                 sta colors+{1},x
                 sta screen+{1},x
-                lda blkBL,y
+                lda (dsBottomPtrLo),y
                 sta colors+{1}+40,x
                 bcc .3
 .1:             sta colors+{1},x
                 sta colors+{1}+40,x
-.2:             lda blkTL,y
+.2:             lda (dsTopPtrLo),y
                 sta screen+{1},x
-                lda blkBL,y
+                lda (dsBottomPtrLo),y
 .3:             sta screen+{1}+40,x
-                subroutine dlend
-                endm
-
-                mac drawright
-                subroutine dr
-                ldy $1000,x
-                lda blkColors,y
-                bmi .1
-                bne .2
-                lda blkTR,y
-                sta colors+{1}+1,x
-                sta screen+{1}+1,x
-                lda blkBR,y
-                sta colors+{1}+41,x
-                bcc .3
-.1:             sta colors+{1}+1,x
-                sta colors+{1}+41,x
-.2:             lda blkTR,y
-                sta screen+{1}+1,x
-                lda blkBR,y
-.3:             sta screen+{1}+41,x
-                subroutine drend
+                subroutine deend
                 endm
 
                 mac drawfullblock
@@ -262,11 +213,8 @@ NEXT_EP         set NEXT_EP + 1
                 subroutine dfbeend
                 endm
 
-                if RIGHTCLIPPING = 0
-
                 mac loadrow
                 txa
-                clc
                 adc mapTblLo+{3},y
                 sta {1}+1
                 sta {2}+1
@@ -275,21 +223,12 @@ NEXT_EP         set NEXT_EP + 1
                 sta {1}+2
                 sta {2}+2
                 endm
-
-                else
-
-                mac loadrow
-                txa
-                clc
-                adc mapTblLo+{4},y
-                sta {1}+1
-                sta {2}+1
-                sta {3}+1
-                lda zpSrcHi
-                adc mapTblHi+{4},y
-                sta {1}+2
-                sta {2}+2
-                sta {3}+2
+                
+                mac adjustedge
+                subroutine ae
+                inc {1}+1
+                bne .1
+                inc {1}+2
+.1:
+                subroutine aeend
                 endm
-
-                endif

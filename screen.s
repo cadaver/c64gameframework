@@ -537,6 +537,13 @@ PrepareDrawScreen:
                 tax
                 lda dsStartTbl,x
                 sta dsStartX
+                lda #>blkTL
+                eor blockX
+                sta dsTopPtrHi
+                ora #$02
+                sta dsBottomPtrHi
+                lda dsEdgeTbl,x
+                sta dsEdgeX
                 lda dsEndTbl,y
                 sta DSUpperHalfEndCmp+1
                 sta DSLowerHalfEndCmp+1
@@ -548,65 +555,64 @@ PrepareDrawScreen:
                 sta DSLowerHalfJump+1
                 lda lowerHalfJumpTblHi,y
                 sta DSLowerHalfJump+2
-                lda blockX
-                sta dsBlockX
-                adc mapX
-                asl
+                tya
+                adc mapY
                 tay
                 lda #$00
                 sta UF_BlockUpdateFlag+1        ;Clear blockupdates now
                 sta scrCounter                  ;And reset scrollcounter
-                rol
-                pha
-                tya
-                sbc dsOffsetTbl,x               ;C=0 here
-                tax
-                pla
-                sbc #$00
                 sta zpSrcHi
-                ldy mapY
-                lda blockY
-                beq PDS_BlockY0
-                iny
-PDS_BlockY0:    if RIGHTCLIPPING = 0
-                loadrow DSRow0,DSLeft0,0
-                loadrow DSRow1,DSLeft1,1
-                loadrow DSRow2,DSLeft2,2
-                loadrow DSRow3,DSLeft3,3
-                loadrow DSRow4,DSLeft4,4
-                loadrow DSRow5,DSLeft5,5
-                loadrow DSRow6,DSLeft6,6
-                loadrow DSRow7,DSLeft7,7
-                loadrow DSRow8,DSLeft8,8
-                loadrow DSRow9,DSLeft9,9
-                loadrow DSRow10,DSLeft10,10
-                lda blockY
-                beq PDS_SkipLoadTop
-                loadrow DSTopRow,DSTopLeft,-1
-                rts
-PDS_SkipLoadTop:loadrow DSBottomRow,DSBottomLeft,11
-                rts
-                else
-                loadrow DSRow0,DSRight0,DSLeft0,0
-                loadrow DSRow1,DSRight1,DSLeft1,1
-                loadrow DSRow2,DSRight2,DSLeft2,2
-                loadrow DSRow3,DSRight3,DSLeft3,3
-                loadrow DSRow4,DSRight4,DSLeft4,4
-                loadrow DSRow5,DSRight5,DSLeft5,5
-                loadrow DSRow6,DSRight6,DSLeft6,6
-                loadrow DSRow7,DSRight7,DSLeft7,7
-                loadrow DSRow8,DSRight8,DSLeft8,8
-                loadrow DSRow9,DSRight9,DSLeft9,9
-                loadrow DSRow10,DSRight10,DSLeft10,10
+                lda blockX
+                sta dsBlockX
+                adc mapX                        ;C=0
+                asl
+                rol zpSrcHi
+                sec
+                sbc dsStartTbl,x
+                tax
+                bcs PDS_MSBOK
+                dec zpSrcHi
+PDS_MSBOK:      clc
+                loadrow DSRow0,DSEdge0,0
+                bcc PDS_NoCarrySet              ;If carry set after first row load, adjust the low offset
+                dex
+PDS_NoCarrySet: loadrow DSRow1,DSEdge1,1
+                loadrow DSRow2,DSEdge2,2
+                loadrow DSRow3,DSEdge3,3
+                loadrow DSRow4,DSEdge4,4
+                loadrow DSRow5,DSEdge5,5
+                loadrow DSRow6,DSEdge6,6
+                loadrow DSRow7,DSEdge7,7
+                loadrow DSRow8,DSEdge8,8
+                loadrow DSRow9,DSEdge9,9
+                loadrow DSRow10,DSEdge10,10
                 lda blockY
                 beq PDS_SkipLoadTop
-                loadrow DSTopRow,DSTopRight,DSTopLeft,-1
+                loadrow DSTopRow,DSTopEdge,-1
+                jmp PDS_SkipLoadBottom
+PDS_SkipLoadTop:loadrow DSBottomRow,DSBottomEdge,11
+PDS_SkipLoadBottom:
+                lda blockX                      ;Adjust edge in case of right one
+                bne PDS_SkipAdjustEdge          ;Increment-adjust is easier than decrement
+                adjustedge DSEdge0
+                adjustedge DSEdge1
+                adjustedge DSEdge2
+                adjustedge DSEdge3
+                adjustedge DSEdge4
+                adjustedge DSEdge5
+                adjustedge DSEdge6
+                adjustedge DSEdge7
+                adjustedge DSEdge8
+                adjustedge DSEdge9
+                adjustedge DSEdge10
+                lda blockY
+                beq PDS_SkipAdjustTop
+                adjustedge DSTopEdge
                 rts
-PDS_SkipLoadTop:loadrow DSBottomRow,DSBottomRight,DSBottomLeft,11
+PDS_SkipAdjustTop:
+                adjustedge DSBottomEdge
+PDS_SkipAdjustEdge:
                 rts
-                endif
-
-PrepareDrawScreenEnd:
 
         ; Redraw screen. Called from main program at zone changes, or from the IRQ when scrolling
         ;
@@ -615,22 +621,17 @@ PrepareDrawScreenEnd:
         ; Modifies: A,X,Y
 
 DrawScreen:     clc
+                ldx dsEdgeX
+                lda dsBlockY
+                beq DSEdge0
+DSTopEdge:      drawbottomedge -1*40
+DSEdge0:        drawedge 0*80
+DSEdge1:        drawedge 1*80
+DSEdge2:        drawedge 2*80
+DSEdge3:        drawedge 3*80
+DSEdge4:        drawedge 4*80
+DSEdge5:        drawedge 5*80
                 ldx dsStartX
-                lda dsBlockX
-                bne DSUpperHalfLeft
-                jmp DSUpperHalfNoLeft
-DSUpperHalfLeft:lda dsBlockY
-                beq DSLeft0
-DSTopLeft:      drawbottomright 0*80
-DSLeft0:        drawright 0*80-1
-DSLeft1:        drawright 1*80-1
-DSLeft2:        drawright 2*80-1
-DSLeft3:        drawright 3*80-1
-DSLeft4:        drawright 4*80-1
-DSLeft5:        drawright 5*80-1
-                inx
-                inx
-DSUpperHalfNoLeft:
                 lda dsBlockY
                 beq DSRow0
 DSTopRow:       drawbottom -1*40-1
@@ -641,46 +642,23 @@ DSRow3:         drawfullblock 3*80-1
 DSRow4:         drawfullblock 4*80-1
 DSRow5:         drawfullblock 5*80-1
 DSUpperHalfEndCmp:
-                cpx #38
+                cpx #37
                 bcs DSUpperHalfDone
                 inx
                 inx
 DSUpperHalfJump:jmp DSRow0
 DSUpperHalfDone:clc
-                if RIGHTCLIPPING > 0
-                lda dsBlockX
-                beq DSUpperHalfRight
-                jmp DSUpperHalfNoRight
-DSUpperHalfRight:
-                inx
-                inx
+                ldx dsEdgeX
                 lda dsBlockY
-                beq DSRight0
-DSTopRight:     drawbottomleft 0*80+38
-DSRight0:       drawleft 0*80-1
-DSRight1:       drawleft 1*80-1
-DSRight2:       drawleft 2*80-1
-DSRight3:       drawleft 3*80-1
-DSRight4:       drawleft 4*80-1
-DSRight5:       drawleft 5*80-1
-DSUpperHalfNoRight:
-                endif
-DrawScreenPatchStart:
-                ldx dsStartX
-                lda dsBlockX
-                bne DSLowerHalfLeft
-                jmp DSLowerHalfNoLeft
-DSLowerHalfLeft:lda dsBlockY
-                bne DSLeft6
-DSBottomLeft:   drawtopright 11*80
-DSLeft6:        drawright 6*80-1
-DSLeft7:        drawright 7*80-1
-DSLeft8:        drawright 8*80-1
-DSLeft9:        drawright 9*80-1
-DSLeft10:       drawright 10*80-1
-                inx
-                inx
+                bne DSEdge6
+DSBottomEdge:   drawtopedge 11*80
+DSEdge6:        drawedge 6*80
+DSEdge7:        drawedge 7*80
+DSEdge8:        drawedge 8*80
+DSEdge9:        drawedge 9*80
+DSEdge10:       drawedge 10*80
 DSLowerHalfNoLeft:
+                ldx dsStartX
                 lda dsBlockY
                 bne DSRow6
 DSBottomRow:    drawtop 11*80-1
@@ -690,38 +668,9 @@ DSRow8:         drawfullblock 8*80-1
 DSRow9:         drawfullblock 9*80-1
 DSRow10:        drawfullblock 10*80-1
 DSLowerHalfEndCmp:
-                cpx #38
+                cpx #37
                 bcs DSLowerHalfDone
                 inx
                 inx
 DSLowerHalfJump:jmp DSRow6
-DSLowerHalfDone:if RIGHTCLIPPING > 0
-                clc
-                lda dsBlockX
-                beq DSLowerHalfRight
-                jmp DSLowerHalfNoRight
-DSLowerHalfRight:
-                inx
-                inx
-                lda dsBlockY
-                bne DSRight6
-DSBottomRight:  drawtopleft 11*80+38
-DSRight6:       drawleft 6*80-1
-DSRight7:       drawleft 7*80-1
-DSRight8:       drawleft 8*80-1
-DSRight9:       drawleft 9*80-1
-DSRight10:      drawleft 10*80-1
-DSLowerHalfNoRight:
-                endif
-                rts
-
-                if NTSCSIZEREDUCE > 0
-
-                if RIGHTCLIPPING > 0
-                ds.b 9,$55          ;Padding; the patched NTSC drawscreen is longer
-                else
-                ds.b 7,$55
-                endif
-
-                endif
-DrawScreenEnd:
+DSLowerHalfDone:rts

@@ -49,7 +49,8 @@ music00.pak: music/example.sng
 
 level00.pak: bg/world00.map bg/world00.lvo bg/world00.lva
 	pchunk3 bg/world00.map level00map.pak
-	pack3 level00.bin level00data.pak
+	filejoin bg/world00.lvo+bg/world00.lva level00data.bin
+	pack3 level00data.bin level00data.pak
 	filejoin level00map.pak+level00data.pak level00.pak
 
 charset00.pak: charset00.s mainsym.s memory.s bg/world00.blk bg/world00.bli bg/world00.chr bg/world00.oba
