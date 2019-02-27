@@ -14,7 +14,7 @@ Features:
 - [Miniplayer](https://github.com/cadaver/miniplayer) music & sound playback
 - Filter cutoff compensation on 8580 SID to make it sound more like 6581
 - Accelerated CPU mode on C128 & SuperCPU, activated in the vertical border
-- Loader based on the Covert Bitops Loadersystem V2.2x (1541/1581/FD/HD/IDE64). Includes fastloading support on the SD2IEC by utilizing the ELoad protocol.
+- Loader based on the Covert Bitops Loadersystem V2.2x, but with added fastloader support for the SD2IEC by utilizing the ELoad protocol.
 - EasyFlash & GMod2 mastering and save support
 - Exomizer3 compression
 
@@ -33,7 +33,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 
 ## Getting started with the code
 
-- boot.s is the disk version boot code. It will first load the Exomizer decompression code and then the compressed disk loader (loader.s), which will detect the drive loaded from, either enable fastloader or not, and proceed to load the mainpart.
+- boot.s is the disk version boot code. It will first load the Exomizer decompression code and then the compressed disk loader (loader.s), which will detect the drive loaded from, and enable one of the three sets of IO routines: regular fastloader, Kernal fallback, or ELoad (SD2IEC) fastloader. Then it proceeds to load the mainpart.
 - efboot.s & gmod2boot.s are the same for EasyFlash & GMod2 cartridges. For the most part, the main code can be agnostic of the device used for loading.
 - main.s is the mainpart, which includes the rest of the framework, and contains the game initialization and main loop. Modify to your own needs!
 - script00.s contains all the loadable code used by the example game's actors (player / items / enemies / bullets / explosions.) Common actor code can just as well be contained statically in the mainpart, this is just to demonstrate dynamic code loading.
