@@ -916,6 +916,8 @@ Drv1MHzWait:    ldx $1800                       ;Wait for CLK=low
                 dc.b $f0,$0b                    ;beq DrvSendDone
 Drv1MHzSendEnd:
 
+drvFamily:      dc.b $43,$0d,$ff
+
 DrvDetect:      sei
                 ldy #$01
 DrvIdLda:       lda $fea0                       ;Recognize drive family
@@ -950,11 +952,8 @@ DrvIdFound:     ldy drvJobTrkLo,x                ;Patch job track/sector
                 cmp #$37
                 bne DrvNot1571                  ;Recognize 1571 as a subtype
                 jsr DrvNoData                   ;Set DATA=low already here, as $904e takes a long time and we would be too late for C64
-                lda #>(DrvDetectDone-1)
-                pha
-                lda #<(DrvDetectDone-1)
-                pha
-                jmp $904e                       ;Enable 2Mhz mode, overwrites buffer at $700
+                jsr $904e                       ;Enable 2Mhz mode, overwrites buffer at $700
+                jmp DrvDetectDone
 DrvNot1571:     ldy #Drv1MHzSendEnd-Drv1MHzSend ;For non-1571, copy 1MHz transfer code
 Drv1MHzCopy:    lda Drv1MHzSend,y
                 sta Drv2MHzSend,y
@@ -1250,7 +1249,6 @@ drvReceiveBuf:  dc.b 0
 
 drvRuntimeEnd:
 
-drvFamily:      dc.b $43,$0d,$ff
 drvIdLocLo:     dc.b $a4,$c6,$e9
 drvIdLocHi:     dc.b $fe,$e5,$a6
 drvIdByte:      dc.b "8","F","H"
@@ -1301,7 +1299,7 @@ ilIDStrings:    dc.b "TRIV"
                 dc.b "CEIU"
 ilIDBuffer:     ds.b 7,0
 
-                if DrvMain < $0500
+                if DrvMain != $0500
                     err
                 endif
                 if DrvSerialAcc11 - DrvMain > $ff
