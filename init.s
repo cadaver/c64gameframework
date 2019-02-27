@@ -225,7 +225,5 @@ stopIrqCodeEnd:
 
         ; Data
 
-defaultConfig:  incbin config.bin
-
 panelCharData:  incbin bg\scorescr.chr
 
