@@ -8,11 +8,15 @@ InitLoader
 SL_StopIrqJsr
 FastLoadEnd
 SlowLoadEnd
+ELoadEnd
 DrvDetect
 DrvMain
 DrvCodeEnd
+EL_SetSpriteRangeJsr
 FL_SetSpriteRangeJsr
+EL_MinSprY
 FL_MinSprY
+EL_MaxSrpY
 FL_MaxSprY
 ntscFlag
 loaderMode

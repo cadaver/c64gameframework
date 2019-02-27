@@ -55,12 +55,14 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 sta actXL,x
                 lda #15
                 sta actYH,x
+                lda #$00
+                sta actD,x
                 jsr InitActor                   ;Init health & actor flags
                 jsr CenterPlayer                ;Center scrolling on player & redraw
                 jsr SavePlayerState             ;Make an "in-memory checkpoint" for restarting
                 jsr UpdateFrame                 ;Show screen just to demonstrate loading while screen is on
                 jsr RedrawHUD
-                
+
                 ldy #C_COMMON
                 jsr LoadResourceFile            ;Preload the common sprites
 

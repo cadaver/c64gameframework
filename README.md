@@ -14,7 +14,7 @@ Features:
 - [Miniplayer](https://github.com/cadaver/miniplayer) music & sound playback
 - Filter cutoff compensation on 8580 SID to make it sound more like 6581
 - Accelerated CPU mode on C128 & SuperCPU, activated in the vertical border
-- Loader based on the Covert Bitops Loadersystem V2.2x (1541/1581/FD/HD/IDE64)
+- Loader based on the Covert Bitops Loadersystem V2.2x (1541/1581/FD/HD/IDE64). Includes fastloading support on the SD2IEC by utilizing the ELoad protocol.
 - EasyFlash & GMod2 mastering and save support
 - Exomizer3 compression
 

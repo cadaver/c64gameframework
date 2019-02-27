@@ -1,4 +1,5 @@
         ; Loader part
+        ; ELoad (SD2IEC) support based on work of Thomas 'skoe' Giesel
 
                 include memory.s
                 include kernal.s
@@ -8,7 +9,7 @@ LOAD_KERNAL     = $00           ;Load using Kernal and do not allow interrupts
 LOAD_FAKEFAST   = $01           ;Load using Kernal, interrupts allowed
 LOAD_EASYFLASH  = $02           ;Load using EasyFlash cartridge
 LOAD_GMOD2      = $03           ;Load using GMod2 cartridge
-LOAD_FAST       = $ff           ;(or any other negative value) Load using custom serial protocol, Kernal not used at all after startup
+LOAD_FAST       = $ff           ;(or any other negative value) Load using custom serial protocol
 
 MW_LENGTH       = 32            ;Bytes in one M-W command
 
@@ -27,12 +28,9 @@ drvSendTblHigh  = $0700
 InitializeDrive = $d005         ;1541 only
 
 loaderCodeStart = FastLoadEnd
+ELoadHelper     = $0200
 
                 org loaderCodeStart
-
-        ; NMI routine
-
-NMI:            rti
 
         ; Loader runtime data
 
@@ -44,11 +42,16 @@ loaderCodeEnd:
 
         ; Loader initialization / entrypoint, 3 bytes from loader loadaddress
 
-InitLoader:     lda #$02
-                jsr Close                       ;Close the file loaded from
-                lda #$0b
+InitLoader:     lda $d011
+                and #$0f
                 sta $d011                       ;Blank screen
+                lda #$02
+                jsr Close                       ;Close the file loaded from
                 ldx #$00
+                stx fileOpen
+                stx loaderMode                  ;Assume Kernal (fallback) mode
+                stx ntscFlag
+                stx fileNumber
 IL_DetectNtsc1: lda $d012                       ;Detect PAL/NTSC/Drean
 IL_DetectNtsc2: cmp $d012
                 beq IL_DetectNtsc2
@@ -64,18 +67,10 @@ IL_CountCycles: inx
 IL_IsNtsc:      inc ntscFlag
 IL_IsDrean:     lda #$f0                        ;Adjust 2-bit transfer delay for NTSC / Drean
                 sta ilFastLoadStart+FL_Delay-OpenFile
-IL_IsPal:       lda #<NMI                       ;Set NMI vector
-                sta $0318
-                sta $fffa
-                sta $fffe
-                lda #>NMI
-                sta $0319
-                sta $fffb
-                sta $ffff
-                lda $dc00                       ;Check for safe mode loader
+IL_IsPal:       lda $dc00                       ;Check for safe mode loader
                 and $dc01
                 and #$10
-                bne IL_DetectDrive
+                bne IL_DetectDriveID
 IL_SafeMode:    lda #$06
                 sta $d020
                 bne IL_NoFastLoad
@@ -92,9 +87,70 @@ IL_CopyStopIrq: lda ilStopIrqCodeStart,x       ;Default IRQ stop code for Kernal
                 bpl IL_CopyStopIrq
                 jmp IL_Done
 
-IL_DetectDrive: lda #$aa
-                sta $a5
-UploadDriveCode:ldy #$00                        ;Init selfmodifying addresses
+        ; Drive detection stage 1: read ID
+
+IL_DetectDriveID:
+                lda #$02                        ;Reset drive, read back ID, using only non-serial routines
+                ldx #<ilUICmd
+                ldy #>ilUICmd
+                jsr SetNam
+                lda #$0f
+                tay
+                ldx fa
+                jsr SetLFS
+                jsr Open
+                ldx #$0f
+                jsr ChkIn
+                ldx #$07
+IL_ReadID:      jsr ChrIn
+                sta ilIDBuffer-1,x
+                dex
+                bne IL_ReadID
+                lda #$0f
+                jsr Close
+                ldx #$ff
+IL_IDMismatch:  lda #$04
+                sta loadTempReg
+IL_IDNext:      inx
+                cpx #$10
+                bcs IL_UploadDriveCode          ;No IDs detected, proceed to drivecode-based detection
+                txa
+                and #$03
+                tay
+                lda ilIDBuffer,y
+                cmp ilIDStrings,x
+                bne IL_IDMismatch
+                dec loadTempReg                 ;Increase match count
+                bne IL_IDNext
+                cpx #$08
+                bcc IL_NoSerial                 ;First two IDs are non-serial devices, the last two are SD2IEC
+
+IL_HasSD2IEC:   ldx #$00
+IL_CopyELoadHelper:
+                lda ilELoadHelper,x             ;Copy full 256 bytes (sector buffer) of ELoad helper code, exact length doesn't matter
+                sta ELoadHelper,x
+                inx
+                bne IL_CopyELoadHelper
+                lda #<(ilELoadStart-1)
+                sta IL_CopyLoaderCode+1
+                lda #>(ilELoadStart-1)
+                sta IL_CopyLoaderCode+2
+                lda #<ELoadNMIHandler
+                sta $0318
+                sta $fffa
+                lda #>ELoadNMIHandler
+                sta $0319
+                sta $fffb
+                lda #80
+                sta $dd04                       ;Setup NMI timer for IEC send
+                stx $dd05
+                jmp IL_FastLoadOK               ;ELoad is a fastloader protocol, which doesn't need especial delay
+
+        ; Drive detection stage 2: upload drivecode to detect serial drive type
+
+IL_NoSD2IEC:
+IL_UploadDriveCode:
+                ldy #$00                        ;Init selfmodifying addresses
                 beq UDC_NextPacket
 UDC_SendMW:     lda ilMWString,x                ;Send M-W command (backwards)
                 jsr CIOut
@@ -114,8 +170,8 @@ UDC_NotOver2:   dex
                 jsr UnLsn                       ;Unlisten to perform the command
 UDC_NextPacket: lda fa                          ;Set drive to listen
                 jsr Listen
-                lda status                      ;Quit if error (IDE64?)
-                bmi IL_NoSerial
+                lda status                      ;Quit to safe mode if error
+                bmi IL_NoFastLoad2
                 lda #$6f
                 jsr Second
                 ldx #$05
@@ -126,21 +182,16 @@ UDC_SendME:     lda ilMEString-1,x              ;Send M-E command (backwards)
                 dex
                 bne UDC_SendME
                 jsr UnLsn
-IL_WaitDataLow: lda status                      ;If error, it's probably IDE64
-                bmi IL_NoSerial
+IL_WaitDataLow: lda status
+                bmi IL_NoFastLoad2
                 bit $dd00                       ;Wait for drivecode to signal activation with DATA=low
                 bpl IL_FastLoadOK               ;If not detected within time window, use slow loading
                 dex
                 bne IL_WaitDataLow
-                lda $a3                         ;If $00 in serial EOI byte, possibly JiffyDos protocol + SD2IEC with no fastload support
-                beq IL_NoFastLoad
-                lda $a5                         ;If serial delay was unchanged, VICE's true drive emu
-                cmp #$aa
-                beq IL_NoSerial
-                bne IL_NoFastLoad
+IL_NoFastLoad2: jmp IL_NoFastLoad
 
-IL_FastLoadOK:  dec loaderMode
-IL_Done:        ldx #loaderCodeStart-OpenFile
+IL_FastLoadOK:  dec loaderMode                  ;Switch to IRQ-loader mode
+IL_Done:        ldx #ilFastLoadEnd-ilFastLoadStart
 IL_CopyLoaderCode:
                 lda ilFastLoadStart-1,x         ;Copy either fastload or slowload IO code
                 sta OpenFile-1,x
@@ -150,10 +201,10 @@ IL_CopyLoaderCode:
                 sta $01
                 lda #>(loaderCodeEnd-1)         ;Store mainpart entrypoint to stack
                 pha
-                tax
                 lda #<(loaderCodeEnd-1)
                 pha
                 lda #<loaderCodeEnd
+                ldx #>loaderCodeEnd
                 jmp LoadFile                    ;Load mainpart (overwrites loader init)
 
         ; Slow fileopen / getbyte / save routines
@@ -240,18 +291,17 @@ SlowSave:       sta zpSrcLo
                 jsr SetLFSOpen
                 jsr ChkOut
                 ldy #$00
-                lda zpBitsLo
-                beq SS_PreDecrement
-SS_Loop:        lda (zpSrcLo),y                 ;Note: save from under Kernal ROM not supported
+                ldx zpBitsHi
+SS_Loop:        lda (zpSrcLo),y
                 jsr ChrOut
                 iny
-                bne SS_NotOver
+                bne SS_NoMSB
                 inc zpSrcHi
-SS_NotOver:     dec zpBitsLo
+                dex
+SS_NoMSB:       cpy zpBitsLo
                 bne SS_Loop
-SS_PreDecrement:dec zpBitsHi
-                bpl SS_Loop
-
+                txa
+                bne SS_Loop
 CloseKernalFile:lda #$02
                 jsr Close
                 lda #$00
@@ -263,22 +313,21 @@ PrepareKernalIO:jsr StopIrq
                 lda #$36
                 sta fileOpen                    ;Set fileopen indicator, raster delays are to be expected
                 sta $01
+                ldx #$00
                 if USETURBOMODE > 0
-                lda #$00
-                sta $d07a                       ;SCPU to slow mode
-                sta $d030                       ;C128 back to 1MHz mode
+                stx $d07a                       ;SCPU to slow mode
+                stx $d030                       ;C128 back to 1MHz mode
                 endif
                 lda fileNumber                  ;Convert filename
                 pha
-                and #$0f
-                ldx #$01
+                lsr
+                lsr
+                lsr
+                lsr
                 jsr CFN_Sub
                 pla
-                lsr
-                lsr
-                lsr
-                lsr
-                dex
+                and #$0f
+                inx
 CFN_Sub:        ora #$30
                 cmp #$3a
                 bcc CFN_Number
@@ -451,18 +500,17 @@ FastSave:       sta zpSrcLo
                 jsr FL_SendByte
                 lda zpBitsHi
                 jsr FL_SendByte
-                ldy #$00
-                lda zpBitsLo
-                beq FS_PreDecrement
+                tay
 FS_Loop:        lda (zpSrcLo),y
                 jsr FL_SendByte
                 iny
-                bne FS_NotOver
+                bne FS_NoMSB
                 inc zpSrcHi
-FS_NotOver:     dec zpBitsLo
+                dec zpBitsHi
+FS_NoMSB:       cpy zpBitsLo
                 bne FS_Loop
-FS_PreDecrement:dec zpBitsHi
-                bpl FS_Loop
+                lda zpBitsHi
+                bne FS_Loop
                 rts
 
 FastLoadEnd:
@@ -470,6 +518,339 @@ FastLoadEnd:
                 rend
 
 ilFastLoadEnd:
+
+        ; ELoad helper code / IEC protocol implementation
+
+ilELoadHelper:
+
+                rorg ELoadHelper
+
+        ; IEC communication routines
+
+ELoadListenAndSecond:
+                pha
+                lda fa
+                ora #$20
+                jsr ELoadSendByteWithATN
+                pla
+ELoadSendByteWithATN:
+                pha
+                lda #$18                        ;CLK & ATN low
+                sta $dd00
+                pla
+ELoadSendByte:  sta loadTempReg
+                lda #$ff
+ELoadSendByteCommon:
+                sta loadBufferPos               ;Bit counter + EOI delay
+                jsr ELoadSendByteWaitDataLow    ;Wait until ready to receive
+                sei
+                lda $dd00                       ;Let go of everything but ATN, start NMI
+                and #$08
+                sta $dd00
+                bit $dd0d
+                lda #%00011001
+                sta $dd0e
+                cli
+ELoadSendByteEndWait:
+                lda loadBufferPos
+                bne ELoadSendByteEndWait        ;Wait until NMI has completed send
+ELoadSendByteWaitDataLow:
+                bit $dd00                       ;Wait until DATA low (listener accepted data)
+                bmi ELoadSendByteWaitDataLow
+                rts
+
+        ; Init the eload1 drivecode
+
+ELoadInit:      lda #"W"
+                ldx #<eloadMWStringEnd
+                jsr ELoadSendCommand
+                lda #"E"
+                ldx #<eloadMEStringEnd
+ELoadSendCommand:
+                sta eloadMWString+2
+                ldy #<eloadMWString
+                lda #$6f
+                jsr ELoadListenAndSecond
+ELoadSendBlock: stx ELoadSendEndCmp+1
+                jsr ELoadPrepareSendBlock
+ELoadSendBlockLoop:
+                lda ELoadHelper,y
+                iny
+ELoadSendEndCmp:cpy #$00
+                beq ELoadSendByteWithEOI
+                jsr ELoadSendByte
+                bpl ELoadSendBlockLoop
+ELoadSendByteWithEOI:
+                sta loadTempReg
+                lda #$ff-$05                    ;Delay for EOI. Note: apparently SD2IEC works also without, as long
+                jsr ELoadSendByteCommon         ;as we Unlisten, but better be correct
+ELoadUnlisten:  lda #$3f                        ;Unlisten command always after EOI
+                jsr ELoadSendByteWithATN
+                jsr ELoadSetLinesIdle
+ELoadWaitDataHigh:
+                bit $dd00                       ;Wait until drive also lets go of DATA line
+                bpl ELoadWaitDataHigh
+                rts
+
+        ; Helper for save
+
+ELoadPrepareWrite:
+                lda #$61
+                jsr ELoadListenAndSecond
+ELoadPrepareSendBlock:
+                lda #$10                        ;Only CLK high for sending non-ATN data
+                sta $dd00
+                rts
+
+        ; Send load command by fast protocol
+
+ELoadSendLoadCmdFast: 
+                bit $dd00                       ;Wait for drive to signal ready to receive
+                bvs ELoadSendLoadCmdFast        ;with CLK low
+                ldx #$20                        ;Pull DATA low to acknowledge
+                stx $dd00
+ELoadSendFastWait:
+                bit $dd00                       ;Wait for drive to release CLK
+                bvc ELoadSendFastWait
+ELoadWaitBorder:lda $d011                       ;Wait to be in border for no badlines
+                bpl ELoadWaitBorder
+                jsr ELoadSetLinesIdle           ;Waste cycles / send 0 bits
+                jsr ELoadSetLinesIdle
+                jsr ELoadDelay12                ;Send the lower nybble (always 1)
+                stx $dd00
+                nop
+                nop
+ELoadSetLinesIdle:
+                lda #$00                        ;Rest of bits / idle value
+ELoadSetLines:  sta $dd00
+ELoadDelay14:   nop
+ELoadDelay12:   rts
+
+        ; Subroutine for filename conversion
+
+ELoadCFNSub:    ora #$30
+                cmp #$3a
+                bcc ECFN_Number
+                adc #$06
+ECFN_Number:    sta eloadFileName,x
+                rts
+
+        ; NMI handler
+
+ELoadNMIHandler:pha
+                lda loadBufferPos
+                bmi ELoadNMIWait
+ELoadNMISend:   lsr
+                lda $dd00                       ;Keep ATN bit
+                and #$08
+                bcs ELoadNMIClockLow
+ELoadNMINextBit:dec loadBufferPos
+                lsr loadTempReg
+                bcs ELoadNMIStore
+                ora #$20
+ELoadNMIStore:  sta $dd00
+ELoadNMINext:   bit $dd0d
+                lda #%00011001
+                sta $dd0e
+ELoadNMIDone:   pla
+                rti
+
+ELoadNMIClockLow:
+                ora #$10
+                dec loadBufferPos
+                bne ELoadNMIStore
+                sta $dd00                       ;CLK low endmark, no more NMIs
+                pla
+                rti
+
+ELoadNMIWait:   bit $dd00                       ;Wait until DATA high
+                bpl ELoadNMINext
+                inc loadBufferPos               ;Delay for normal or EOI send
+                bmi ELoadNMINext
+                lda #$11                        ;Init counter for sending the bits
+                sta loadBufferPos
+                bne ELoadNMINext
+
+        ; Strings
+
+eloadMWString:  dc.b "M-W"
+                dc.w $0300
+eloadMEStringEnd:
+                dc.b 6
+                dc.b "eload1"
+eloadMWStringEnd:
+
+eloadReplace:   dc.b "@0:"
+eloadFileName:  dc.b "  "
+eloadFileNameEnd:
+
+ELoadHelperEnd:
+                rend
+
+ilELoadHelperEnd:
+
+        ; ELoad (SD2IEC) fileopen / getbyte / save routines
+
+ilELoadStart:
+
+                rorg OpenFile
+
+        ; Open file
+        ;
+        ; Parameters: fileNumber
+        ; Returns: -
+        ; Modifies: A,X,Y
+
+                jmp ELoadOpen
+
+        ; Save file
+        ;
+        ; Parameters: A,X startaddress, zpBitsLo-Hi amount of bytes, fileNumber
+        ; Returns: -
+        ; Modifies: A,X,Y
+
+                jmp ELoadSave
+
+        ; Read a byte from an opened file
+        ;
+        ; Parameters: -
+        ; Returns: if C=0, byte in A. If C=1, EOF/errorcode in A:
+        ; $00 - EOF (no error)
+        ; $02 - File not found
+        ; $80 - Device not present
+        ; $ff - File not found (SD2IEC)
+        ; Modifies: A
+
+ELoadGetByte:   lda fileOpen
+                beq ELoadGetByteEOF
+                jsr ELoadGetByteFast
+                dec loadBufferPos
+                beq ELoadRefill
+ELoadSetSpriteRangeDummy:
+ELoadNoRefill:  rts
+
+ELoadGetByteEOF:lda loadBufferPos
+                sec
+                rts
+
+ELoadOpen:      lda fileOpen                    ;File already open?
+                bne ELoadOpenDone
+                lda #$f0                        ;Open for read
+                jsr ELoadOpenFileShort
+                jsr ELoadInit
+                jsr ELoadSendLoadCmdFast
+EL_SetSpriteRangeJsr:                           ;This will be changed by game to set sprite Y-range before transfer
+                jsr ELoadSetSpriteRangeDummy
+ELoadRefill:    pha
+                jsr ELoadGetByteFast
+                bcc ELoadRefillFinish
+
+ELoadGetByteFast:
+                bit $dd00                       ;Wait for drive to signal data ready with
+                bmi ELoadGetByteFast            ;DATA low
+ELoadSpriteWait:lda $d012                       ;Check for sprite Y-coordinate range
+EL_MaxSprY:     cmp #$00                        ;(max & min values are filled in the
+                bcs ELoadNoSprites              ;raster interrupt)
+EL_MinSprY:     cmp #$00
+                bcs ELoadSpriteWait
+ELoadNoSprites: sei
+ELoadBadlineWait:
+                lda $d011
+                clc
+                sbc $d012
+                and #7
+                beq ELoadBadlineWait
+                nop
+                nop
+                lda #$10                        ;Signal transmission with CLK low - CLK high
+                sta $dd00
+                bit loadTempReg
+                lda #$00
+                sta $dd00
+                pha                             ;Waste 14 cycles before reading
+                pla
+                pha
+                pla
+                lda $dd00
+                lsr
+                lsr
+                eor $dd00
+                lsr
+                lsr
+                eor $dd00
+                lsr
+                lsr
+                clc                             ; This used to be the EOR for supporting multiple videobanks
+                eor $dd00
+                cli
+                rts
+
+ELoadRefillFinish:
+                sta loadBufferPos               ;Bytes left, EOF ($00) or error ($ff)
+                beq ELoadFileEnded
+                cmp #$ff
+                bcc ELoadRefillDone
+ELoadFileEnded: lda #$e0
+ELoadFileEndedFinish:
+                jsr ELoadCloseFile
+                clc
+ELoadRefillDone:pla
+ELoadOpenDone:  rts
+
+ELoadSave:      sta zpSrcLo
+                stx zpSrcHi
+                lda #$f1                        ;Open for write
+                ldy #<eloadReplace              ;Use the long filename with replace command
+                jsr ELoadOpenFile
+                jsr ELoadPrepareWrite
+                ldx zpBitsHi
+                ldy #$00
+                beq ELoadSaveFirst
+ELoadSaveNotLast:
+                jsr ELoadSendByte
+ELoadSaveFirst: lda (zpSrcLo),y
+                iny
+                bne ELoadSaveNoMSB
+                inc zpSrcHi
+                dex
+ELoadSaveNoMSB: cpy zpBitsLo
+                bne ELoadSaveNotLast
+                cpx #$00
+                bne ELoadSaveNotLast
+ELoadSaveLast:  jsr ELoadSendByteWithEOI
+                lda #$e1
+ELoadCloseFile: jsr ELoadListenAndSecond
+                jsr ELoadUnlisten
+                dec fileOpen
+                rts
+
+ELoadOpenFileShort:
+                ldy #<eloadFileName
+ELoadOpenFile:  inc fileOpen
+                ldx #$00
+                if USETURBOMODE > 0
+                stx $d07a                       ;SCPU to slow mode
+                stx $d030                       ;C128 back to 1MHz mode
+                endif
+                jsr ELoadListenAndSecond
+                lda fileNumber                  ;Convert filename
+                pha
+                lsr
+                lsr
+                lsr
+                lsr
+                jsr ELoadCFNSub
+                pla
+                and #$0f
+                inx
+                jsr ELoadCFNSub
+                ldx #<eloadFileNameEnd
+                jmp ELoadSendBlock
+
+ELoadEnd:
+                rend
+
+ilELoadEnd:
 
                 if ilFastLoadEnd - ilFastLoadStart > $ff
                 err
@@ -479,19 +860,33 @@ ilFastLoadEnd:
                 err
                 endif
 
-                if FastLoadEnd > loaderCodeStart
+                if ilELoadEnd - ilELoadStart > $ff
                 err
                 endif
 
-                if SlowLoadEnd > loaderCodeStart
+                if SlowLoadEnd > FastLoadEnd
                 err
                 endif
 
-        ; Diskdrive code + upload commands
+                if ELoadEnd > FastLoadEnd
+                err
+                endif
 
-ilMWString:     dc.b MW_LENGTH,>drvStart, <drvStart,"W-M"
-ilMEString:     dc.b >DrvDetect,<DrvDetect, "E-M"
-ilNumPackets:   dc.b (ilDriveCodeEnd-ilDriveCode+MW_LENGTH-1)/MW_LENGTH
+                if ELoadHelperEnd > $0300
+                err
+                endif
+
+                if FL_MaxSprY != EL_MaxSprY
+                err
+                endif
+
+                if FL_MinSprY != EL_MinSprY
+                err
+                endif
+
+                if FL_SetSpriteRangeJsr != EL_SetSpriteRangeJsr
+                err
+                endif
 
 ilDriveCode:
                 rorg drvStart
@@ -892,6 +1287,20 @@ drv1800Ofs:     dc.b Drv2MHzSerialAcc1-DrvMain
 DrvCodeEnd:
                 rend
 
+ilDriveCodeEnd:
+
+        ; Drive detection + drivecode upload commands
+
+ilMWString:     dc.b MW_LENGTH,>drvStart, <drvStart,"W-M"
+ilMEString:     dc.b >DrvDetect,<DrvDetect, "E-M"
+ilNumPackets:   dc.b (ilDriveCodeEnd-ilDriveCode+MW_LENGTH-1)/MW_LENGTH
+ilUICmd:        dc.b "UI"
+ilIDStrings:    dc.b "TRIV"
+                dc.b "EDI "
+                dc.b "I2DS"
+                dc.b "CEIU"
+ilIDBuffer:     ds.b 7,0
+
                 if DrvMain < $0500
                     err
                 endif
@@ -904,6 +1313,4 @@ DrvCodeEnd:
                 if DrvCodeEnd > $0800
                     err
                 endif
-
-ilDriveCodeEnd:
 

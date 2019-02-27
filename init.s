@@ -60,30 +60,10 @@ InitZeroPage:   lda #<fileAreaStart
                 lda #$0b                        ;Blank screen now
                 sta $d011
 
-        ; Initialize sprite multiplexing order
-
-InitSprites:    ldx #MAX_SPR
-ISpr_Loop:      txa
-                sta sprOrder,x
-                lda #$ff
-                sta sprY,x
-                dex
-                bpl ISpr_Loop
-
-        ; Initialize sprite cache variables + the empty sprite
-
-                ldx #$3f
-ISprC_Loop:     lda #$ff
-                sta cacheSprFile,x
-                lda #$00
-                sta cacheSprAge,x
-                sta emptySprite,x
-                dex
-                bpl ISprC_Loop
-
         ; Initialize video + SID registers
 
-InitVideo:      sta $d01b                       ;Sprites on top of BG
+InitVideo:      lda #$00
+                sta $d01b                       ;Sprites on top of BG
                 sta $d01d                       ;Sprite X-expand off
                 sta $d017                       ;Sprite Y-expand off
                 sta $d020
@@ -155,14 +135,34 @@ IPC_PanelSpriteLoop:
                 lda #$60                        ;Prevent crash if charset animation attempted without charset
                 sta charAnimCodeJump
 
-        ; Initialize resources
-        
-                ldx #MAX_CHUNKFILES
+        ; Initialize sprite cache variables + the empty sprite
+
+                ldx #$3f
+ISprC_Loop:     lda #$ff
+                sta cacheSprFile,x
                 lda #$00
+                sta cacheSprAge,x
+                sta emptySprite,x
+                dex
+                bpl ISprC_Loop
+
+        ; Initialize resources
+
+                ldx #MAX_CHUNKFILES
 IR_Loop:        sta fileHi,x
                 sta fileAge,x
                 dex
                 bpl IR_Loop
+
+        ; Initialize sprite multiplexing order & sprite Y coords
+
+InitSprites:    ldx #MAX_SPR
+ISpr_Loop:      txa
+                sta sprOrder,x
+                lda #$ff
+                sta sprY,x
+                dex
+                bpl ISpr_Loop
 
         ; Initialize PAL/NTSC differences
 
