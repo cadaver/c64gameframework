@@ -527,22 +527,22 @@ ilELoadHelper:
 
         ; IEC communication routines
 
-ELoadListenAndSecond:
+EL_ListenAndSecond:
                 pha
                 lda fa
                 ora #$20
-                jsr ELoadSendByteWithATN
+                jsr EL_SendByteWithATN
                 pla
-ELoadSendByteWithATN:
+EL_SendByteWithATN:
                 pha
                 lda #$18                        ;CLK & ATN low
                 sta $dd00
                 pla
-ELoadSendByte:  sta loadTempReg
+EL_SendByte:    sta loadTempReg
                 lda #$ff
-ELoadSendByteCommon:
+EL_SendByteCommon:
                 sta loadBufferPos               ;Bit counter + EOI delay
-                jsr ELoadSendByteWaitDataLow    ;Wait until ready to receive
+                jsr EL_SendByteWaitDataLow      ;Wait until ready to receive
                 sei
                 lda $dd00                       ;Let go of everything but ATN, start NMI
                 and #$08
@@ -551,125 +551,119 @@ ELoadSendByteCommon:
                 lda #%00011001
                 sta $dd0e
                 cli
-ELoadSendByteEndWait:
+EL_SendByteEndWait:
                 lda loadBufferPos
-                bne ELoadSendByteEndWait        ;Wait until NMI has completed send
-ELoadSendByteWaitDataLow:
+                bne EL_SendByteEndWait          ;Wait until NMI has completed send
+EL_SendByteWaitDataLow:
                 bit $dd00                       ;Wait until DATA low (listener accepted data)
-                bmi ELoadSendByteWaitDataLow
+                bmi EL_SendByteWaitDataLow
                 rts
 
         ; Init the eload1 drivecode
 
-ELoadInit:      lda #"W"
+EL_Init:        lda #"W"
                 ldx #<eloadMWStringEnd
-                jsr ELoadSendCommand
+                jsr EL_SendCommand
                 lda #"E"
                 ldx #<eloadMEStringEnd
-ELoadSendCommand:
-                sta eloadMWString+2
+EL_SendCommand: sta eloadMWString+2
                 ldy #<eloadMWString
                 lda #$6f
-                jsr ELoadListenAndSecond
-ELoadSendBlock: stx ELoadSendEndCmp+1
-                jsr ELoadPrepareSendBlock
-ELoadSendBlockLoop:
+                jsr EL_ListenAndSecond
+EL_SendBlock: stx EL_SendEndCmp+1
+                jsr EL_PrepareSendBlock
+EL_SendBlockLoop:
                 lda ELoadHelper,y
                 iny
-ELoadSendEndCmp:cpy #$00
-                beq ELoadSendByteWithEOI
-                jsr ELoadSendByte
-                bpl ELoadSendBlockLoop
-ELoadSendByteWithEOI:
+EL_SendEndCmp:  cpy #$00
+                beq EL_SendByteWithEOI
+                jsr EL_SendByte
+                bpl EL_SendBlockLoop
+EL_SendByteWithEOI:
                 sta loadTempReg
-                lda #$ff-$05                    ;Delay for EOI. Note: apparently SD2IEC works also without, as long
-                jsr ELoadSendByteCommon         ;as we Unlisten, but better be correct
-ELoadUnlisten:  lda #$3f                        ;Unlisten command always after EOI
-                jsr ELoadSendByteWithATN
-                jsr ELoadSetLinesIdle
-ELoadWaitDataHigh:
-                bit $dd00                       ;Wait until drive also lets go of DATA line
-                bpl ELoadWaitDataHigh
+                lda #$ff-$05                    ;Delay for EOI
+                jsr EL_SendByteCommon
+EL_Unlisten:    lda #$3f                        ;Unlisten command always after EOI
+                jsr EL_SendByteWithATN
+                jsr EL_SetLinesIdle
+EL_WaitDataHigh:bit $dd00                       ;Wait until drive also lets go of DATA line
+                bpl EL_WaitDataHigh
                 rts
 
         ; Helper for save
 
-ELoadPrepareWrite:
-                lda #$61
-                jsr ELoadListenAndSecond
-ELoadPrepareSendBlock:
+EL_PrepareWrite:lda #$61
+                jsr EL_ListenAndSecond
+EL_PrepareSendBlock:
                 lda #$10                        ;Only CLK high for sending non-ATN data
                 sta $dd00
                 rts
 
         ; Send load command by fast protocol
 
-ELoadSendLoadCmdFast: 
+EL_SendLoadCmdFast: 
                 bit $dd00                       ;Wait for drive to signal ready to receive
-                bvs ELoadSendLoadCmdFast        ;with CLK low
+                bvs EL_SendLoadCmdFast        ;with CLK low
                 ldx #$20                        ;Pull DATA low to acknowledge
                 stx $dd00
-ELoadSendFastWait:
-                bit $dd00                       ;Wait for drive to release CLK
-                bvc ELoadSendFastWait
-ELoadWaitBorder:lda $d011                       ;Wait to be in border for no badlines
-                bpl ELoadWaitBorder
-                jsr ELoadSetLinesIdle           ;Waste cycles / send 0 bits
-                jsr ELoadSetLinesIdle
-                jsr ELoadDelay12                ;Send the lower nybble (always 1)
+EL_SendFastWait:bit $dd00                       ;Wait for drive to release CLK
+                bvc EL_SendFastWait
+EL_WaitBorder:  lda $d011                       ;Wait to be in border for no badlines
+                bpl EL_WaitBorder
+                jsr EL_SetLinesIdle           ;Waste cycles / send 0 bits
+                jsr EL_SetLinesIdle
+                jsr EL_Delay12                ;Send the lower nybble (always 1)
                 stx $dd00
                 nop
                 nop
-ELoadSetLinesIdle:
-                lda #$00                        ;Rest of bits / idle value
-ELoadSetLines:  sta $dd00
-ELoadDelay14:   nop
-ELoadDelay12:   rts
+EL_SetLinesIdle:lda #$00                        ;Rest of bits / idle value
+                sta $dd00
+                nop
+EL_Delay12:     rts
 
         ; Subroutine for filename conversion
 
-ELoadCFNSub:    ora #$30
+EL_CFNSub:      ora #$30
                 cmp #$3a
-                bcc ECFN_Number
+                bcc EL_CFNNumber
                 adc #$06
-ECFN_Number:    sta eloadFileName,x
+EL_CFNNumber:   sta eloadFileName,x
                 rts
 
         ; NMI handler
 
 ELoadNMIHandler:pha
                 lda loadBufferPos
-                bmi ELoadNMIWait
-ELoadNMISend:   lsr
+                bmi EL_NMIWait
+EL_NMISend:     lsr
                 lda $dd00                       ;Keep ATN bit
                 and #$08
-                bcs ELoadNMIClockLow
-ELoadNMINextBit:dec loadBufferPos
+                bcs EL_NMIClockLow              ;Alternate CLK bit, send data bits with CLK high
+EL_NMINextBit:  dec loadBufferPos
                 lsr loadTempReg
-                bcs ELoadNMIStore
+                bcs EL_NMIStore
                 ora #$20
-ELoadNMIStore:  sta $dd00
-ELoadNMINext:   bit $dd0d
+EL_NMIStore:    sta $dd00
+EL_NMINext:     bit $dd0d                       ;Restart NMI timer if more to send
                 lda #%00011001
                 sta $dd0e
-ELoadNMIDone:   pla
+EL_NMIDone:     pla
                 rti
 
-ELoadNMIClockLow:
-                ora #$10
+EL_NMIClockLow: ora #$10
                 dec loadBufferPos
-                bne ELoadNMIStore
-                sta $dd00                       ;CLK low endmark, no more NMIs
+                bne EL_NMIStore
+                sta $dd00                       ;CLK low endmark & no more NMIs
                 pla
                 rti
 
-ELoadNMIWait:   bit $dd00                       ;Wait until DATA high
-                bpl ELoadNMINext
+EL_NMIWait:     bit $dd00                       ;Wait until DATA high
+                bpl EL_NMINext
                 inc loadBufferPos               ;Delay for normal or EOI send
-                bmi ELoadNMINext
+                bmi EL_NMINext
                 lda #$11                        ;Init counter for sending the bits
                 sta loadBufferPos
-                bne ELoadNMINext
+                bne EL_NMINext
 
         ; Strings
 
@@ -722,44 +716,44 @@ ilELoadStart:
         ; Modifies: A
 
 ELoadGetByte:   lda fileOpen
-                beq ELoadGetByteEOF
-                jsr ELoadGetByteFast
+                beq EL_GetByteEOF
+                jsr EL_GetByteFast
                 dec loadBufferPos
-                beq ELoadRefill
-ELoadSetSpriteRangeDummy:
-ELoadNoRefill:  rts
+                beq EL_Refill
+EL_SetSpriteRangeDummy:
+EL_NoRefill:    rts
 
-ELoadGetByteEOF:lda loadBufferPos
+EL_GetByteEOF:lda loadBufferPos
                 sec
                 rts
 
 ELoadOpen:      lda fileOpen                    ;File already open?
-                bne ELoadOpenDone
+                bne EL_OpenDone
                 lda #$f0                        ;Open for read
-                jsr ELoadOpenFileShort
-                jsr ELoadInit
-                jsr ELoadSendLoadCmdFast
+                jsr EL_OpenFileShort
+                jsr EL_Init
+                jsr EL_SendLoadCmdFast
 EL_SetSpriteRangeJsr:                           ;This will be changed by game to set sprite Y-range before transfer
-                jsr ELoadSetSpriteRangeDummy
-ELoadRefill:    pha
-                jsr ELoadGetByteFast
-                bcc ELoadRefillFinish
+                jsr EL_SetSpriteRangeDummy
+EL_Refill:      pha
+                jsr EL_GetByteFast
+                bcc EL_RefillFinish
 
-ELoadGetByteFast:
+EL_GetByteFast:
                 bit $dd00                       ;Wait for drive to signal data ready with
-                bmi ELoadGetByteFast            ;DATA low
-ELoadSpriteWait:lda $d012                       ;Check for sprite Y-coordinate range
+                bmi EL_GetByteFast            ;DATA low
+EL_SpriteWait:  lda $d012                       ;Check for sprite Y-coordinate range
 EL_MaxSprY:     cmp #$00                        ;(max & min values are filled in the
-                bcs ELoadNoSprites              ;raster interrupt)
+                bcs EL_NoSprites              ;raster interrupt)
 EL_MinSprY:     cmp #$00
-                bcs ELoadSpriteWait
-ELoadNoSprites: sei
-ELoadBadlineWait:
+                bcs EL_SpriteWait
+EL_NoSprites:   sei
+EL_BadlineWait:
                 lda $d011
                 clc
                 sbc $d012
                 and #7
-                beq ELoadBadlineWait
+                beq EL_BadlineWait
                 nop
                 nop
                 lda #$10                        ;Signal transmission with CLK low - CLK high
@@ -785,67 +779,65 @@ ELoadBadlineWait:
                 cli
                 rts
 
-ELoadRefillFinish:
-                sta loadBufferPos               ;Bytes left, EOF ($00) or error ($ff)
-                beq ELoadFileEnded
+EL_RefillFinish:sta loadBufferPos               ;Bytes left, EOF ($00) or error ($ff)
+                beq EL_FileEnded
                 cmp #$ff
-                bcc ELoadRefillDone
-ELoadFileEnded: lda #$e0
-ELoadFileEndedFinish:
-                jsr ELoadCloseFile
+                bcc EL_RefillDone
+EL_FileEnded:   lda #$e0
+EL_FileEndedFinish:
+                jsr EL_CloseFile
                 clc
-ELoadRefillDone:pla
-ELoadOpenDone:  rts
+EL_RefillDone:  pla
+EL_OpenDone:    rts
 
 ELoadSave:      sta zpSrcLo
                 stx zpSrcHi
                 lda #$f1                        ;Open for write
                 ldy #<eloadReplace              ;Use the long filename with replace command
-                jsr ELoadOpenFile
-                jsr ELoadPrepareWrite
+                jsr EL_OpenFile
+                jsr EL_PrepareWrite
                 ldx zpBitsHi
                 ldy #$00
-                beq ELoadSaveFirst
-ELoadSaveNotLast:
-                jsr ELoadSendByte
-ELoadSaveFirst: lda (zpSrcLo),y
+                beq EL_SaveFirst
+EL_SaveNotLast: jsr EL_SendByte
+EL_SaveFirst:   lda (zpSrcLo),y
                 iny
-                bne ELoadSaveNoMSB
+                bne EL_SaveNoMSB
                 inc zpSrcHi
                 dex
-ELoadSaveNoMSB: cpy zpBitsLo
-                bne ELoadSaveNotLast
+EL_SaveNoMSB:   cpy zpBitsLo
+                bne EL_SaveNotLast
                 cpx #$00
-                bne ELoadSaveNotLast
-ELoadSaveLast:  jsr ELoadSendByteWithEOI
+                bne EL_SaveNotLast
+EL_SaveLast:    jsr EL_SendByteWithEOI
                 lda #$e1
-ELoadCloseFile: jsr ELoadListenAndSecond
-                jsr ELoadUnlisten
+EL_CloseFile:   jsr EL_ListenAndSecond
+                jsr EL_Unlisten
                 dec fileOpen
                 rts
 
-ELoadOpenFileShort:
+EL_OpenFileShort:
                 ldy #<eloadFileName
-ELoadOpenFile:  inc fileOpen
+EL_OpenFile:    inc fileOpen
                 ldx #$00
                 if USETURBOMODE > 0
                 stx $d07a                       ;SCPU to slow mode
                 stx $d030                       ;C128 back to 1MHz mode
                 endif
-                jsr ELoadListenAndSecond
+                jsr EL_ListenAndSecond
                 lda fileNumber                  ;Convert filename
                 pha
                 lsr
                 lsr
                 lsr
                 lsr
-                jsr ELoadCFNSub
+                jsr EL_CFNSub
                 pla
                 and #$0f
                 inx
-                jsr ELoadCFNSub
+                jsr EL_CFNSub
                 ldx #<eloadFileNameEnd
-                jmp ELoadSendBlock
+                jmp EL_SendBlock
 
 ELoadEnd:
                 rend
