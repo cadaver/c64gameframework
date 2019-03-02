@@ -541,35 +541,34 @@ EL_SendByteCommon:
                 sta $dd00                       ;CLK high -> ready to send; wait for DATA high response
                 jsr EL_WaitDataHigh
                 pha
-                lda #$40
+                lda #$60
                 sec
 EL_WaitEOI:     sbc #$01                        ;Wait until we are sure to have generated an EOI response
                 cmp #$09                        ;It doesn't matter that every byte we send is with EOI
                 bcs EL_WaitEOI
-                jsr EL_WaitDataHigh             ;Wait for DATA high again (EOI response over)
-                lda #$08
+                jsr EL_WaitDataHigh             ;Wait until EOI response over
                 sta loadBufferPos               ;Bit counter
                 pla
-                beq EL_SendByteLoop
-EL_SendWaitBorder:
-                bit $d011                       ;On SD2IEC the last bit of Listen/Unlisten is critical to send undelayed
-                bpl EL_SendWaitBorder           ;as delay means JiffyDOS activation. Wait for border (no interrupts) for ATN bytes
 EL_SendByteLoop:and #$08                        ;CLK low
                 ora #$10
-                jsr EL_SetLineAndDelay          ;Use JSR to set $dd00 to apply a delay
+                sei                             ;Timing of last CLK high (last bit) in ATN bytes is critical for SD2IEC,
+                sta $dd00                       ;as delay means enabling JiffyDOS, which we don't want. For simplicity,
+                jsr EL_Delay2X                  ;disable IRQs for each bit sent, causing IRQ delay similar to the 2-bit transfer
                 dec loadBufferPos
                 bmi EL_SendByteDone
                 and #$08
                 lsr loadTempReg
                 bcs EL_SendBitOne
                 ora #$20                        ;CLK high + data bit
-EL_SendBitOne:  jsr EL_SetLineAndDelay
+EL_SendBitOne:  sta $dd00
+                cli
+                jsr EL_Delay2X
                 jmp EL_SendByteLoop
+EL_SendByteDone:cli
+                rts
 
-EL_SetLineAndDelay:
-                jsr EL_SetLine
-                jsr EL_SetLine
-EL_SendByteDone:rts
+EL_Delay2X:     jsr EL_Delay14
+                jmp EL_Delay12
 
         ; Init the eload1 drivecode
 
@@ -616,7 +615,7 @@ EL_SendFastWaitBorder:
                 nop
 EL_SetLinesIdle:lda #$00                        ;Rest of bits / idle value
 EL_SetLine:     sta $dd00
-                nop
+EL_Delay14:     nop
 EL_Delay12:     rts
 
         ; Subroutine for filename conversion
