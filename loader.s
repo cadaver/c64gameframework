@@ -135,15 +135,6 @@ IL_CopyELoadHelper:
                 sta IL_CopyLoaderCode+1
                 lda #>(ilELoadStart-1)
                 sta IL_CopyLoaderCode+2
-                lda #<ELoadNMIHandler
-                sta $0318
-                sta $fffa
-                lda #>ELoadNMIHandler
-                sta $0319
-                sta $fffb
-                lda #80
-                sta $dd04                       ;Setup NMI timer for IEC send
-                stx $dd05
                 jmp IL_FastLoadOK               ;ELoad is a fastloader protocol, which doesn't need especial delay
 
         ; Drive detection stage 2: upload drivecode to detect serial drive type
@@ -531,33 +522,54 @@ EL_ListenAndSecond:
                 pha
                 lda fa
                 ora #$20
-                jsr EL_SendByteWithATN
+                jsr EL_SendByteATN
                 pla
-EL_SendByteWithATN:
-                pha
-                lda #$18                        ;CLK & ATN low
+                jsr EL_SendByteATN
+                lda #$10                        ;After the secondary address, just CLK low for further non-ATN bytes
                 sta $dd00
-                pla
-EL_SendByte:    sta loadTempReg
-                lda #$ff
-EL_SendByteCommon:
-                sta loadBufferPos               ;Bit counter + EOI delay
-                jsr EL_SendByteWaitDataLow      ;Wait until ready to receive
-                sei
-                lda $dd00                       ;Let go of everything but ATN, start NMI
-                and #$08
-                sta $dd00
-                bit $dd0d
-                lda #%00011001
-                sta $dd0e
-                cli
-EL_SendByteEndWait:
-                lda loadBufferPos
-                bne EL_SendByteEndWait          ;Wait until NMI has completed send
-EL_SendByteWaitDataLow:
-                bit $dd00                       ;Wait until DATA low (listener accepted data)
-                bmi EL_SendByteWaitDataLow
                 rts
+
+EL_SendByteATN: sta loadTempReg
+                lda #$08
+                bne EL_SendByteCommon
+
+EL_SendByte:    sta loadTempReg
+EL_WaitDataLow: bit $dd00                       ;For non-ATN bytes, wait for DATA low before we continue
+                bmi EL_WaitDataLow
+                lda #$00
+EL_SendByteCommon:
+                sta $dd00                       ;CLK high -> ready to send; wait for DATA high response
+                jsr EL_WaitDataHigh
+                pha
+                lda #$40
+                sec
+EL_WaitEOI:     sbc #$01                        ;Wait until we are sure to have generated an EOI response
+                cmp #$09                        ;It doesn't matter that every byte we send is with EOI
+                bcs EL_WaitEOI
+                jsr EL_WaitDataHigh             ;Wait for DATA high again (EOI response over)
+                lda #$08
+                sta loadBufferPos               ;Bit counter
+                pla
+                beq EL_SendByteLoop
+EL_SendWaitBorder:
+                bit $d011                       ;On SD2IEC the last bit of Listen/Unlisten is critical to send undelayed
+                bpl EL_SendWaitBorder           ;as delay means JiffyDOS activation. Wait for border (no interrupts) for ATN bytes
+EL_SendByteLoop:and #$08                        ;CLK low
+                ora #$10
+                jsr EL_SetLineAndDelay          ;Use JSR to set $dd00 to apply a delay
+                dec loadBufferPos
+                bmi EL_SendByteDone
+                and #$08
+                lsr loadTempReg
+                bcs EL_SendBitOne
+                ora #$20                        ;CLK high + data bit
+EL_SendBitOne:  jsr EL_SetLineAndDelay
+                jmp EL_SendByteLoop
+
+EL_SetLineAndDelay:
+                jsr EL_SetLine
+                jsr EL_SetLine
+EL_SendByteDone:rts
 
         ; Init the eload1 drivecode
 
@@ -570,54 +582,40 @@ EL_SendCommand: sta eloadMWString+2
                 ldy #<eloadMWString
                 lda #$6f
                 jsr EL_ListenAndSecond
-EL_SendBlock: stx EL_SendEndCmp+1
-                jsr EL_PrepareSendBlock
+EL_SendBlock:   stx EL_SendEndCmp+1
 EL_SendBlockLoop:
                 lda ELoadHelper,y
+                jsr EL_SendByte
                 iny
 EL_SendEndCmp:  cpy #$00
-                beq EL_SendByteWithEOI
-                jsr EL_SendByte
-                bpl EL_SendBlockLoop
-EL_SendByteWithEOI:
-                sta loadTempReg
-                lda #$ff-$05                    ;Delay for EOI
-                jsr EL_SendByteCommon
-EL_Unlisten:    lda #$3f                        ;Unlisten command always after EOI
-                jsr EL_SendByteWithATN
-                jsr EL_SetLinesIdle
-EL_WaitDataHigh:bit $dd00                       ;Wait until drive also lets go of DATA line
-                bpl EL_WaitDataHigh
-                rts
-
-        ; Helper for save
-
-EL_PrepareWrite:lda #$61
-                jsr EL_ListenAndSecond
-EL_PrepareSendBlock:
-                lda #$10                        ;Only CLK high for sending non-ATN data
-                sta $dd00
+                bcc EL_SendBlockLoop
+EL_Unlisten:    lda #$3f                        ;Unlisten command always after a block
+                jsr EL_SendByteATN
+                jsr EL_SetLinesIdle             ;Let go of DATA+CLK+ATN
+EL_WaitDataHigh:bit $dd00                       ;Wait until device lets go of the DATA line
+                bpl EL_WaitDataHigh             
                 rts
 
         ; Send load command by fast protocol
 
 EL_SendLoadCmdFast: 
                 bit $dd00                       ;Wait for drive to signal ready to receive
-                bvs EL_SendLoadCmdFast        ;with CLK low
+                bvs EL_SendLoadCmdFast          ;with CLK low
                 ldx #$20                        ;Pull DATA low to acknowledge
                 stx $dd00
 EL_SendFastWait:bit $dd00                       ;Wait for drive to release CLK
                 bvc EL_SendFastWait
-EL_WaitBorder:  lda $d011                       ;Wait to be in border for no badlines
-                bpl EL_WaitBorder
-                jsr EL_SetLinesIdle           ;Waste cycles / send 0 bits
+EL_SendFastWaitBorder:  
+                bit $d011                       ;Wait to be in border for no badlines
+                bpl EL_SendFastWaitBorder
+                jsr EL_SetLinesIdle             ;Waste cycles / send 0 bits
                 jsr EL_SetLinesIdle
-                jsr EL_Delay12                ;Send the lower nybble (always 1)
+                jsr EL_Delay12                  ;Send the lower nybble (always 1)
                 stx $dd00
                 nop
                 nop
 EL_SetLinesIdle:lda #$00                        ;Rest of bits / idle value
-                sta $dd00
+EL_SetLine:     sta $dd00
                 nop
 EL_Delay12:     rts
 
@@ -629,41 +627,6 @@ EL_CFNSub:      ora #$30
                 adc #$06
 EL_CFNNumber:   sta eloadFileName,x
                 rts
-
-        ; NMI handler
-
-ELoadNMIHandler:pha
-                lda loadBufferPos
-                bmi EL_NMIWait
-EL_NMISend:     lsr
-                lda $dd00                       ;Keep ATN bit
-                and #$08
-                bcs EL_NMIClockLow              ;Alternate CLK bit, send data bits with CLK high
-EL_NMINextBit:  dec loadBufferPos
-                lsr loadTempReg
-                bcs EL_NMIStore
-                ora #$20
-EL_NMIStore:    sta $dd00
-EL_NMINext:     bit $dd0d                       ;Restart NMI timer if more to send
-                lda #%00011001
-                sta $dd0e
-EL_NMIDone:     pla
-                rti
-
-EL_NMIClockLow: ora #$10
-                dec loadBufferPos
-                bne EL_NMIStore
-                sta $dd00                       ;CLK low endmark & no more NMIs
-                pla
-                rti
-
-EL_NMIWait:     bit $dd00                       ;Wait until DATA high
-                bpl EL_NMINext
-                inc loadBufferPos               ;Delay for normal or EOI send
-                bmi EL_NMINext
-                lda #$11                        ;Init counter for sending the bits
-                sta loadBufferPos
-                bne EL_NMINext
 
         ; Strings
 
@@ -795,21 +758,21 @@ ELoadSave:      sta zpSrcLo
                 lda #$f1                        ;Open for write
                 ldy #<eloadReplace              ;Use the long filename with replace command
                 jsr EL_OpenFile
-                jsr EL_PrepareWrite
+                lda #$61
+                jsr EL_ListenAndSecond          ;Open write stream
                 ldx zpBitsHi
                 ldy #$00
-                beq EL_SaveFirst
-EL_SaveNotLast: jsr EL_SendByte
-EL_SaveFirst:   lda (zpSrcLo),y
+EL_SaveLoop:    lda (zpSrcLo),y
+                jsr EL_SendByte
                 iny
                 bne EL_SaveNoMSB
                 inc zpSrcHi
                 dex
 EL_SaveNoMSB:   cpy zpBitsLo
-                bne EL_SaveNotLast
-                cpx #$00
-                bne EL_SaveNotLast
-EL_SaveLast:    jsr EL_SendByteWithEOI
+                bne EL_SaveLoop
+                txa
+                bne EL_SaveLoop
+                jsr EL_Unlisten
                 lda #$e1
 EL_CloseFile:   jsr EL_ListenAndSecond
                 jsr EL_Unlisten
