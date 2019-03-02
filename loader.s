@@ -541,7 +541,7 @@ EL_SendByteCommon:
                 sta $dd00                       ;CLK high -> ready to send; wait for DATA high response
                 jsr EL_WaitDataHigh
                 pha
-                lda #$60
+                lda #$5f
                 sec
 EL_WaitEOI:     sbc #$01                        ;Wait until we are sure to have generated an EOI response
                 cmp #$09                        ;It doesn't matter that every byte we send is with EOI
@@ -553,21 +553,21 @@ EL_SendByteLoop:and #$08                        ;CLK low
                 ora #$10
                 sei                             ;Timing of last CLK high (last bit) in ATN bytes is critical for SD2IEC,
                 sta $dd00                       ;as delay means enabling JiffyDOS, which we don't want. For simplicity,
-                jsr EL_Delay2X                  ;disable IRQs for each bit sent, causing IRQ delay similar to the 2-bit transfer
-                dec loadBufferPos
+                dec loadBufferPos               ;disable IRQs for each bit sent, causing IRQ delay similar to the 2-bit transfer
                 bmi EL_SendByteDone
+                jsr EL_Delay23
                 and #$08
                 lsr loadTempReg
                 bcs EL_SendBitOne
                 ora #$20                        ;CLK high + data bit
 EL_SendBitOne:  sta $dd00
                 cli
-                jsr EL_Delay2X
+                jsr EL_Delay18                  ;Shorter delay needed after CLK high
                 jmp EL_SendByteLoop
 EL_SendByteDone:cli
                 rts
 
-EL_Delay2X:     jsr EL_Delay14
+EL_Delay23:     jsr EL_Delay14
                 jmp EL_Delay12
 
         ; Init the eload1 drivecode
@@ -614,7 +614,7 @@ EL_SendFastWaitBorder:
                 nop
                 nop
 EL_SetLinesIdle:lda #$00                        ;Rest of bits / idle value
-EL_SetLine:     sta $dd00
+EL_Delay18:     sta $dd00
 EL_Delay14:     nop
 EL_Delay12:     rts
 
@@ -626,7 +626,7 @@ EL_CFNSub:      ora #$30
                 adc #$06
 EL_CFNNumber:   sta eloadFileName,x
                 rts
-
+                
         ; Strings
 
 eloadMWString:  dc.b "M-W"
