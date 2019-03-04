@@ -69,7 +69,7 @@ gb_get_done:
 DepackError:
         rts
 
-        ; Load file packed with Exomizer 2 forward mode
+        ; Load file packed with Exomizer 3 forward mode
         ;
         ; Parameters: A,X load address, fileNumber
         ; Returns: C=0 if loaded OK, or C=1 and error code in A (see GetByte)
