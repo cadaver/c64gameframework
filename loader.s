@@ -141,7 +141,7 @@ IL_CopyELoadHelper:
 
 IL_NoSD2IEC:
 IL_UploadDriveCode:
-                ldy #$00                        ;Init selfmodifying addresses
+                ldy #$00                        
                 beq UDC_NextPacket
 UDC_SendMW:     lda ilMWString,x                ;Send M-W command (backwards)
                 jsr CIOut
@@ -541,7 +541,7 @@ EL_SendByteCommon:
                 sta $dd00                       ;CLK high -> ready to send; wait for DATA high response
                 jsr EL_WaitDataHigh
                 pha
-                lda #$5f
+                lda #$60
                 sec
 EL_WaitEOI:     sbc #$01                        ;Wait until we are sure to have generated an EOI response
                 cmp #$09                        ;It doesn't matter that every byte we send is with EOI
@@ -555,20 +555,20 @@ EL_SendByteLoop:and #$08                        ;CLK low
                 sta $dd00                       ;as delay means enabling JiffyDOS, which we don't want. For simplicity,
                 dec loadBufferPos               ;disable IRQs for each bit sent, causing IRQ delay similar to the 2-bit transfer
                 bmi EL_SendByteDone
-                jsr EL_Delay23
+                jsr EL_Delay25
                 and #$08
                 lsr loadTempReg
                 bcs EL_SendBitOne
                 ora #$20                        ;CLK high + data bit
 EL_SendBitOne:  sta $dd00
                 cli
-                jsr EL_Delay18                  ;Shorter delay needed after CLK high
+                jsr EL_Delay25
                 jmp EL_SendByteLoop
 EL_SendByteDone:cli
                 rts
 
-EL_Delay23:     jsr EL_Delay14
-                jmp EL_Delay12
+EL_Delay25:     jsr EL_Delay14
+                jmp EL_Delay14
 
         ; Init the eload1 drivecode
 
