@@ -2804,8 +2804,6 @@ void editzone()
         else
             zone.fill--;
     }
-    if (key == KEY_Q)
-        zone.bg1 -= 16;
 
     if (shiftdown && !ctrldown && (key == KEY_DEL || key == KEY_BACKSPACE))
     {
