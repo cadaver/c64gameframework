@@ -555,19 +555,19 @@ EL_SendByteLoop:and #$08                        ;CLK low
                 sta $dd00                       ;as delay means enabling JiffyDOS, which we don't want. For simplicity,
                 dec loadBufferPos               ;disable IRQs for each bit sent, causing IRQ delay similar to the 2-bit transfer
                 bmi EL_SendByteDone
-                jsr EL_Delay25
+                jsr EL_Delay29
                 and #$08
                 lsr loadTempReg
                 bcs EL_SendBitOne
                 ora #$20                        ;CLK high + data bit
 EL_SendBitOne:  sta $dd00
                 cli
-                jsr EL_Delay25
+                jsr EL_Delay18
                 jmp EL_SendByteLoop
 EL_SendByteDone:cli
                 rts
 
-EL_Delay25:     jsr EL_Delay14
+EL_Delay29:     jsr EL_Delay18
                 jmp EL_Delay14
 
         ; Init the eload1 drivecode
