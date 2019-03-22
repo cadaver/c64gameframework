@@ -437,7 +437,6 @@ ilMWString:     dc.b MW_LENGTH,>drvStart, <drvStart,"W-M"
 ilMEString:     dc.b >DrvDetect,<DrvDetect, "E-M"
 ilNumPackets:   dc.b (ilDriveCodeEnd-ilDriveCode+MW_LENGTH-1)/MW_LENGTH
 ilUICmd:        dc.b "UI"
-ilIDBuffer:
 
         ; Init loader
         ;
@@ -1213,3 +1212,4 @@ ilELoadHelperEnd:
                 err
                 endif
 
+ilIDBuffer:
