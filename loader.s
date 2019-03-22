@@ -22,7 +22,7 @@ id              = $16           ;Disk ID (1541 only)
 
 drvFileTrk      = $0300
 drvBuf          = $0400         ;Sector data buffer
-drvStart        = $0400
+drvStart        = $0404
 drvFileSct      = $0700
 InitializeDrive = $d005         ;1541 only
 
@@ -58,18 +58,56 @@ Drv1MHzWait:    ldx $1800                       ;Wait for CLK=low
                 beq *+13
 Drv1MHzSendEnd:
 
+drvFamily:      dc.b $43,$0d,$ff
+drvIdByte:      dc.b "8","F","H"
 drvIdLocLo:     dc.b $a4,$c6,$e9
 drvIdLocHi:     dc.b $fe,$e5,$a6
+
+drvPatchData:
 drvJobTrkLo:    dc.b <$000d,<$000d,<$2802
 drvJobTrkHi:    dc.b >$000d,>$000d,>$2802
+drvJobSctLo:    dc.b <$000e,<$000e,<$2803
+drvJobSctHi:    dc.b >$000e,>$000e,>$2803
 drvExecLo:      dc.b <$ff54,<DrvFdExec,<$ff4e
 drvExecHi:      dc.b >$ff54,>DrvFdExec,>$ff4e
+drvLedBit:      dc.b $40,$40,$00
+drvLedAdrHi:    dc.b $40,$40,$05
+drvLedAdrHi2:   dc.b $40,$40,$05
 drvDirTrkLo:    dc.b <$022b,<$54,<$2ba7
 drvDirTrkHi:    dc.b >$022b,>$54,>$2ba7
 drvDirSctLo:    dc.b <drv1581DirSct,<$56,<$2ba9
 drvDirSctHi:    dc.b >drv1581DirSct,>$56,>$2ba9
-drvLedAdrHi:    dc.b $40,$40,$05
-drvLedBit:      dc.b $40,$40,$00
+
+drvPatchOfs:    dc.b DrvReadTrk+1-DrvReadTrk
+                dc.b DrvReadTrk+2-DrvReadTrk
+                dc.b DrvReadSct+1-DrvReadTrk
+                dc.b DrvReadSct+2-DrvReadTrk
+                dc.b DrvExecJsr+1-DrvReadTrk
+                dc.b DrvExecJsr+2-DrvReadTrk
+                dc.b DrvLed+1-DrvReadTrk
+                dc.b DrvLedAcc0+2-DrvReadTrk
+                dc.b DrvLedAcc1+2-DrvReadTrk
+                dc.b DrvDirTrk+1-DrvReadTrk
+                dc.b DrvDirTrk+2-DrvReadTrk
+                dc.b DrvDirSct+1-DrvReadTrk
+                dc.b DrvDirSct+2-DrvReadTrk
+                dc.b 0
+                
+drv1800Lo:      dc.b <$4001,<$4001,<$8000
+drv1800Hi:      dc.b >$4001,>$4001,>$8000
+
+drv1800Ofs:     dc.b Drv2MHzSerialAcc1-Drv2MHzSerialAcc1+1
+                dc.b Drv2MHzSerialAcc2-Drv2MHzSerialAcc1+1
+                dc.b Drv2MHzSerialAcc3-Drv2MHzSerialAcc1+1
+                dc.b Drv2MHzSerialAcc4-Drv2MHzSerialAcc1+1
+                dc.b Drv2MHzSerialAcc5-Drv2MHzSerialAcc1+1
+                dc.b Drv2MHzSerialAcc6-Drv2MHzSerialAcc1+1
+                dc.b DrvSerialAcc7-Drv2MHzSerialAcc1+1
+                dc.b DrvSerialAcc8-Drv2MHzSerialAcc1+1
+                dc.b DrvSerialAcc9-Drv2MHzSerialAcc1+1
+                dc.b DrvSerialAcc10-Drv2MHzSerialAcc1+1
+                dc.b DrvSerialAcc11-Drv2MHzSerialAcc1+1
+                dc.b 0
 
 DrvDetect:      sei
                 ldy #$01
@@ -99,40 +137,15 @@ DrvIdFound:     txa
                 bne DrvNot1571                  ;Recognize 1571 as a subtype
                 jsr DrvNoData                   ;Set DATA=low to signal C64 we're here, before the slow 2MHz enable
                 jsr $904e                       ;Enable 2Mhz mode, overwrites buffer at $700
-                jmp DrvDetectDone
+                jmp DrvPatchDone
 DrvNot1571:     ldy #Drv1MHzSendEnd-Drv1MHzSend-1 ;For non-1571, copy 1MHz transfer code
 Drv1MHzCopy:    lda Drv1MHzSend,y
                 sta DrvSendPatchStart,y
                 dey
                 bpl Drv1MHzCopy
-                bmi DrvDetectDone
-DrvNot1541:     ldy drvJobTrkLo-1,x             ;Patch job track/sector
-                sty DrvReadTrk+1
-                iny
-                sty DrvReadSct+1
-                lda drvJobTrkHi-1,x
-                sta DrvReadTrk+2
-                sta DrvReadSct+2
-                lda drvDirTrkLo-1,x             ;Patch directory track/sector
-                sta DrvDirTrk+1
-                lda drvDirTrkHi-1,x
-                sta DrvDirTrk+2
-                lda drvDirSctLo-1,x
-                sta DrvDirSct+1
-                lda drvDirSctHi-1,x
-                sta DrvDirSct+2
-                lda drvExecLo-1,x               ;Patch job exec address
-                sta DrvExecJsr+1
-                lda drvExecHi-1,x
-                sta DrvExecJsr+2
-                lda drvLedBit-1,x               ;Patch drive led accesses
-                sta DrvLed+1
-                lda drvLedAdrHi-1,x
-                sta DrvLedAcc0+2
-                sta DrvLedAcc1+2
-                lda #$60                        ;Patch exit jump as RTS
-                sta DrvExitJump
-DrvPatch1800Loop:  
+                bmi DrvPatchDone
+DrvNot1541:     
+DrvPatch1800Loop:
                 ldy drv1800Ofs                  ;Patch $1800 accesses
                 beq DrvPatch1800Done            ;Offset 0 = endmark
                 lda drv1800Lo-1,x
@@ -142,8 +155,21 @@ DrvPatch1800Loop:
                 inc DrvPatch1800Loop+1
                 bne DrvPatch1800Loop
 DrvPatch1800Done:
-DrvDetectDone:  jsr DrvNoData                   ;Set DATA=low to signal C64 we're here
-                txa
+DrvPatchGeneralLoop:
+                ldy drvPatchOfs
+                beq DrvPatchGeneralDone         ;Offset 0 = endmark
+                lda drvPatchData-1,x
+                sta DrvReadTrk,y
+                inx
+                inx
+                inx
+                inc DrvPatchGeneralLoop+1
+                bne DrvPatchGeneralLoop
+DrvPatchGeneralDone:
+                lda #$60                        ;Patch exit jump as RTS
+                sta DrvExitJump
+DrvPatchDone:   jsr DrvNoData                   ;Set DATA=low to signal C64 we're here
+                tax
 DrvBeginDelay:  inx                             ;Delay to make sure C64 catches the signal
                 bne DrvBeginDelay
 
@@ -393,37 +419,11 @@ drv1581DirSct  = drvSendTbl+5                   ;Byte $03
 drv1541DirTrk:  dc.b 18
 drvReceiveBuf:
 
-drv1800Lo:      dc.b <$4001,<$4001,<$8000
-drv1800Hi:      dc.b >$4001,>$4001,>$8000
-drv1800Ofs:     dc.b Drv2MHzSerialAcc1-Drv2MHzSerialAcc1+1
-                dc.b Drv2MHzSerialAcc2-Drv2MHzSerialAcc1+1
-                dc.b Drv2MHzSerialAcc3-Drv2MHzSerialAcc1+1
-                dc.b Drv2MHzSerialAcc4-Drv2MHzSerialAcc1+1
-                dc.b Drv2MHzSerialAcc5-Drv2MHzSerialAcc1+1
-                dc.b Drv2MHzSerialAcc6-Drv2MHzSerialAcc1+1
-                dc.b DrvSerialAcc7-Drv2MHzSerialAcc1+1
-                dc.b DrvSerialAcc8-Drv2MHzSerialAcc1+1
-                dc.b DrvSerialAcc9-Drv2MHzSerialAcc1+1
-                dc.b DrvSerialAcc10-Drv2MHzSerialAcc1+1
-                dc.b DrvSerialAcc11-Drv2MHzSerialAcc1+1
-                dc.b 0
-
-drvFamily:      dc.b $43,$0d,$ff
-drvIdByte:      dc.b "8","F","H"
-
-                if (drvFamily & $ff) > $fa
-                    err
-                endif
-
-                if (drv1800Ofs & $ff) > $f4
-                    err
-                endif
-                
                 if drvReceiveBuf >= $0700
                     err
                 endif
 
-                if (DrvMain < $0500)
+                if (DrvMain != $0500)
                     err
                 endif
 
