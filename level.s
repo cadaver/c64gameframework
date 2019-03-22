@@ -187,7 +187,7 @@ CL_NoAutoDeact: jsr RemoveLevelActors
                 lda loadTempReg
                 sta levelNum
                 ldx #F_LEVEL
-                jsr MakeFileName
+                jsr MakeFileNumber
                 lda musicDataLo                 ;Forget zone buffer now to allow maximum memory area while
                 sta zoneBufferLo                ;loading
                 lda musicDataHi
@@ -195,10 +195,10 @@ CL_NoAutoDeact: jsr RemoveLevelActors
                 ldy #C_LEVEL
                 sty loadRes
                 jsr PurgeFile                   ;Remove the old level
-                jsr LF_CustomFileName           ;This part will be automatically retried on error
+                jsr LoadResourceCustomFileName
                 lda #<lvlObjX                   ;After the map data, load the object / actor definitions (compressed normally)
                 ldx #>lvlObjX
-                jsr LoadFile
+                jsr Depack
                 ldy levelNum
                 lda lvlActBitStart,y
                 sta zpSrcLo
@@ -288,10 +288,11 @@ CZ_LoadedCharset:
                 beq CZ_SameCharset
                 sta CZ_LoadedCharset+1
                 ldx #F_CHARSET
-                jsr MakeFileName
+                jsr MakeFileNumber
+                jsr OpenFile
                 lda #<blkTL
                 ldx #>blkTL
-                jsr LoadFile
+                jsr Depack
 CZ_SameCharset:
                 ldy #MAX_LVLOBJ-1               ;Find levelobjects in zone
                 ldx #$00

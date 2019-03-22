@@ -232,3 +232,26 @@ NEXT_EP         set NEXT_EP + 1
 .1:
                 subroutine aeend
                 endm
+
+                mac copycrtcode
+                subroutine ccc
+                ldx #>({2}-{1}+$ff)
+                ldy #$00
+                lda #<{1}
+                sta zpSrcLo
+                lda #>{1}
+                sta zpSrcHi
+                lda #<{3}
+                sta zpDestLo
+                lda #>{3}
+                sta zpDestHi
+.1:             lda (zpSrcLo),y
+                sta (zpDestLo),y
+                iny
+                bne .1
+                inc zpSrcHi
+                inc zpDestHi
+                dex
+                bne .1
+                subroutine cccend
+                endm

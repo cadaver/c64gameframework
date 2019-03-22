@@ -1,6 +1,5 @@
-GetByte
-OpenFile
-SaveFile
-LoadFile
 Depack
-packedLoaderStart
+DepackDestSet
+exomizerCodeStart
+exomizerCodeEnd
+ldepackCodeEnd

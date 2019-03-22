@@ -1,25 +1,24 @@
         ; Exomizer + loader stored as packed data
 
-EXOMIZER_ERRORHANDLING = 1                      ;Error handling needed when loading from disk
-
-                include kernal.s
                 include memory.s
+                include kernal.s
 
                 org exomizerCodeStart
 
                 include exomizer.s
 
-OpenFile:       rts                             ;Initial OpenFile routine: do nothing
-SaveFile        = OpenFile+3                    ;Initial SaveFile routine doesn't exist / isn't used
-GetByte         = OpenFile+6
+exomizerCodeEnd:
 
+OpenFile        = exomizerCodeEnd
+SaveFile        = exomizerCodeEnd+3
+GetByte         = exomizerCodeEnd+6
+
+                php
                 jsr ChrIn
-                clc
+                plp
                 rts
+                jmp OpenFile
 
-                org GetByte
-                jmp OpenFile+1                  ;Initial GetByte routine: jump to implementation above
+ldepackCodeEnd:
+                incbin loader.pak
 
-packedLoaderStart:
-                incbin loader.pak               ;Packed loader data
-                

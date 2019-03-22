@@ -20,12 +20,13 @@ C_PLAYER        = 2                             ;Player sprites
 C_ENEMY         = 3                             ;Enemy sprites
 C_SCRIPT0       = 4                             ;First script (loadable code) file, with player + enemy movement / render code
 
-C_FIRSTPURGEABLE = C_PLAYER                     ;First chunk that can be removed from memory. Put e.g. always resident spritefiles 
+C_FIRSTPURGEABLE = C_PLAYER                     ;First chunk that can be removed from memory. Put e.g. always resident spritefiles
                                                 ;to lower indices
 C_FIRSTSCRIPT   = C_SCRIPT0                     ;Remember to update this, otherwise sprite etc. resources will be relocated as code!
 
                 include memory.s
                 include loadsym.s
+                include ldepacksym.s
 
                 org loaderCodeEnd
 
@@ -64,7 +65,7 @@ EntryPoint:     ldx #$ff                        ;Init stack pointer to top
                 jsr RedrawHUD
 
                 ldy #C_COMMON
-                jsr LoadResourceFile            ;Preload the common sprites
+                jsr LoadResource                ;Preload the common sprites
 
 MainLoop:       jsr ScrollLogic
                 jsr DrawActors

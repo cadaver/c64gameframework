@@ -8,6 +8,9 @@
                 var loadTempReg                 ;Loader variables
                 var loadBufferPos
                 var fileOpen
+                var ntscFlag
+                var loaderMode
+                var fileNumber                  ;Not needed by loader, but used by main code to remember the file currently accessed
 
                 var zpLenLo                     ;Exomizer 3 depackroutine variables
                 var zpSrcLo

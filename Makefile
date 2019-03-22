@@ -21,19 +21,18 @@ examplegmod2.crt: example.d64 example.seq main.pak loadsym.s mainsymcart.s gmod2
 	makegmod2 gmod2boot.bin example.seq examplegmod2.bin
 	cartconv -p -i examplegmod2.bin -o examplegmod2.crt -t gmod2
 
-loader.prg: kernal.s loader.s ldepack.s exomizer.s macros.s memory.s loadsym.txt ldepacksym.txt
-	dasm ldepack.s -oldepack.prg -sldepack.tbl -f3
+loader.prg: exomizer.s loader.s kernal.s memory.s
+	dasm ldepack.s -oloader.prg -f3 -sldepack.tbl
 	symbols ldepack.tbl ldepacksym.s ldepacksym.txt
-	dasm loader.s -oloader.bin -sloader.tbl -f3
+	dasm loader.s -oloader.bin -f3 -sloader.tbl
 	symbols loader.tbl loadsym.s loadsym.txt
 	pack3 loader.bin loader.pak
-	dasm ldepack.s -oloader.prg -sldepack.tbl -f3
-	symbols ldepack.tbl ldepacksym.s ldepacksym.txt
+	dasm ldepack.s -oloader.prg -f3 -sldepack.tbl
 
-boot.prg: boot.s loader.prg
+boot.prg: boot.s kernal.s loader.prg
 	dasm boot.s -oboot.prg
 
-main.pak: loadsym.s ldepacksym.s memory.s defines.s main.s init.s input.s file.s screen.s raster.s math.s sound.s \
+main.pak: loader.prg memory.s defines.s main.s init.s input.s file.s screen.s raster.s math.s sound.s \
 	panel.s actor.s sprite.s physics.s level.s ai.s \
 	actordata.s sounddata.s aligneddata.s playroutinedata.s \
 	bg/worldinfo.s bg/scorescr.chr

@@ -153,7 +153,7 @@ PrS_LoadedMusic:cmp #$ff                        ;Check if module already loaded
                 beq PrS_Done
                 sta PrS_LoadedMusic+1
                 ldx #F_MUSIC
-                jsr MakeFileName
+                jsr MakeFileNumber
                 lda Play_FadeSpd+1
                 beq PrS_NoFadeWait
                 lda $d01a                       ;Wait for fade to complete if we're already fading
@@ -163,6 +163,7 @@ PrS_FadeWait:   lda masterVol
                 bne PrS_FadeWait
 PrS_NoFadeWait: lda #$ff
                 sta PlayRoutine+1               ;Silence during loading
+                lda fileNumber
                 jsr OpenFile                    ;Music files are Exomizer level mode output,
                 jsr GetByte                     ;meaning they start with startaddress hi/lo
                 sta musicDataHi                 ;Reset zonebuffer ptr. now
@@ -173,7 +174,7 @@ PrS_NoFadeWait: lda #$ff
                 jsr PurgeUntilFreeNoNew         ;Purge files if necessary to fit the music
                 lda musicDataLo
                 ldx musicDataHi
-                jsr LoadFile                    ;Load the actual music data
+                jsr Depack                      ;Load the actual music data
 
         ; Set music data address.
 

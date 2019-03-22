@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <memory.h>
 
-#define MAXFILES 0x80
-#define FIRSTSAVEFILE 0x78
+#define MAXFILES 0x100
+#define FIRSTSAVEFILE 0xf0
 
 unsigned char* cart = new unsigned char[0x100000];
 unsigned char* usedsectors = new unsigned char[0x1000];
@@ -35,12 +35,12 @@ int getfreeoffset(int filesize)
 
 void insertfile(unsigned char filenum, int startoffset, unsigned char* data, int filesize, bool leaveholes = false)
 {
-    if (filenum < 0x80)
+    if (filenum < FIRSTSAVEFILE)
     {
         cart[0x0000+filenum] = ((startoffset >> 8) & 0x3f) + 0x80; // Startoffset within bank
-        cart[0x0080+filenum] = (startoffset >> 14); // Bank
-        cart[0x0100+filenum] = (filesize-1) & 0xff;
-        cart[0x0180+filenum] = (filesize-1) >> 8;
+        cart[0x0100+filenum] = (startoffset >> 14); // Bank
+        cart[0x0200+filenum] = filesize & 0xff;
+        cart[0x0300+filenum] = filesize >> 8;
     }
     memcpy(&cart[startoffset], data, filesize);
     int sectors = (filesize+0xff) >> 8;
@@ -82,7 +82,7 @@ int main(int argc, char **argv)
     memset(cart, 0xff, 0x100000);
     memset(usedsectors, 0, 0x1000);
     // Mark the "directory" used
-    for (int i = 0x00; i < 0x02; ++i)
+    for (int i = 0x00; i < 0x04; ++i)
         usedsectors[i] = 1;
 
     printf("Reading bootcode\n");
@@ -154,7 +154,7 @@ int main(int argc, char **argv)
     }
 
     savestartoffset = (maxsize + 0x1ffff) & 0xfffe0000;
-    cart[0x01ff] = (savestartoffset >> 14); // Save start bank
+    cart[0x03ff] = (savestartoffset >> 14); // Save start bank
     memset(cart+savestartoffset, 0xff, 0x20000);
     memset(cart+savestartoffset, 0x00, 0x100); // Make a "full" save directory, so that we will erase it as the first thing
     maxsize += 0x20000;

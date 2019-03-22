@@ -1,6 +1,6 @@
 ; File directory order
 boot.prg EXAMPLE
-loader.prg LO
+loader.prg LOADER
 main.pak 00
 music00.pak 01
 charset00.pak 02

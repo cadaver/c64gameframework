@@ -46,7 +46,7 @@ DLS_ComplexConnectCommon:
 DLS_ComplexNoConnect:
                 jmp DLS_ComplexBounds           ;DO NOT CHANGE THIS, modified in code
 
-DLS_LoadSprFile:jsr LoadResourceFile
+DLS_LoadSprFile:jsr LoadResource
                 jmp DLS_SprFileLoaded
 
 DrawLogicalSpriteDir:

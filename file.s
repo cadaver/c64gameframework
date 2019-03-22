@@ -1,17 +1,16 @@
 C_LEVEL         = 0                             ;Level chunk is fixed, and will be loaded from different filenames
 
-        ; Create a number-based file name
+        ; Set file number, add file type
         ;
-        ; Parameters: A file number, X file number add
-        ; Returns: fileName,C=0
+        ; Parameters: A file number, X file type add
+        ; Returns: fileNumber (also in A), C=0
         ; Modifies: A,X,zpSrcLo
 
-MakeFileName:   stx zpSrcLo
+MakeFileNumber: stx zpSrcLo
                 clc
                 adc zpSrcLo
-MakeFileName_Direct:
                 sta fileNumber
-LF_NoError:     rts
+OFWR_OK:        rts
 
         ; Allocate & load a resource file, and return address of object from inside.
         ; If no memory, purge unused files.
@@ -33,39 +32,39 @@ GetScriptResource:
                 pla
 
 GetResourceObject:
-LoadResourceFile:
-                sta LF_ObjNum+1
+LoadResource:   sta LR_ObjNum+1
                 sty loadRes
-LF_WasLoaded:   lda fileHi,y
-                beq LF_NotInMemory
+LR_WasLoaded:   lda fileHi,y
+                beq LR_NotInMemory
                 sta zpDestHi
                 lda fileLo,y
                 sta zpDestLo                    ;Reset file age whenever accessed
                 lda #$00
                 sta fileAge,y
-LF_ObjNum:      lda #$00
+LR_ObjNum:      lda #$00
                 asl
                 tay
-LF_GetObjectAddress:
+LR_GetObjectAddress:
                 lda (zpDestLo),y
                 sta zpSrcLo
                 iny
                 lda (zpDestLo),y
                 sta zpSrcHi
                 rts
-LF_NotInMemory: tya
+LR_NotInMemory: tya
                 ldx #F_CHUNK
-                jsr MakeFileName
-LF_CustomFileName:
+                jsr MakeFileNumber
+LoadResourceCustomFileName:
                 ldx #C_FIRSTPURGEABLE           ;When loading, age all other chunkfiles
-LF_AgeLoop:     ldy fileHi,x
-                beq LF_AgeSkip
+LR_AgeLoop:     ldy fileHi,x
+                beq LR_AgeSkip
                 lda fileAge,x                   ;Needless to age past $80
-                bmi LF_AgeSkip
+                bmi LR_AgeSkip
                 inc fileAge,x
-LF_AgeSkip:     inx
+LR_AgeSkip:     inx
                 cpx #MAX_CHUNKFILES
-                bcc LF_AgeLoop
+                bcc LR_AgeLoop
+                lda fileNumber
                 jsr OpenFile
                 jsr GetByte                     ;Get datasize lowbyte
                 sta dataSizeLo
@@ -77,7 +76,7 @@ LF_AgeSkip:     inx
                 jsr PurgeUntilFree
                 lda freeMemLo
                 ldx freeMemHi
-                jsr LoadFile
+                jsr Depack
 
         ; Finish loading, relocate chunk object pointers
 
@@ -86,7 +85,8 @@ LF_AgeSkip:     inx
                 sta zpBitsLo
                 sta zpDestLo
                 sta fileLo,y
-                adc dataSizeLo                  ;C=0 here
+                clc
+                adc dataSizeLo
                 sta freeMemLo
                 lda freeMemHi
                 sta zpBitsHi
@@ -95,20 +95,67 @@ LF_AgeSkip:     inx
                 adc dataSizeHi
                 sta freeMemHi
                 cpy #C_FIRSTSCRIPT              ;Is script that requires code relocation?
-                bcc LF_NotScript
+                bcc LR_NotScript
                 lda zpBitsHi                    ;Scripts are initially relocated at $8000
                 sbc #>scriptCodeRelocStart      ;to distinguish between resident & loadable code
                 sta zpBitsHi
-LF_NotScript:   jsr LF_Relocate
+LR_NotScript:   jsr LR_Relocate
                 ldy loadRes
-                jmp LF_WasLoaded                ;Retry getting the object address now
+                jmp LR_WasLoaded                ;Retry getting the object address now
 
-LF_Relocate:    ldx fileNumObjects,y
+LR_Relocate:    ldx fileNumObjects,y
                 sty zpBitBuf
                 ;txa                            ;There are no objectless files
-                ;beq LF_RelocDone
+                ;beq LR_RelocDone
                 ldy #$00
-LF_RelocateLoop:lda (zpDestLo),y                ;Relocate object pointers
+LR_RelocateLoop:jsr LR_RelocAddDelta
+                iny
+                dex
+                bne LR_RelocateLoop
+LR_RelocDone:   lda zpBitBuf
+                cmp #C_FIRSTSCRIPT
+                bcc LR_NoCodeReloc
+                tya                             ;Go past the object pointers to get into code
+LR_CodeRelocLoop:
+                ldx #<zpDestLo
+                jsr Add8
+                ldy #$00
+                lda (zpDestLo),y                ;Read instruction
+                beq LR_CodeRelocDone            ;BRK - done
+                lsr
+                lsr
+                lsr
+                bcc LR_LookupLength
+                and #$01                        ;Instructions xc - xf are always 3 bytes
+                ora #$02                        ;Instructions x4 - x7 are always 2 bytes
+                bne LR_HasLength
+LR_LookupLength:tax
+                lda (zpDestLo),y
+                and #$03
+                tay
+                lda instrLenTbl,x               ;4 lengths packed into one byte
+LR_DecodeLength:dey
+                bmi LR_DecodeLengthDone
+                lsr                             ;Shift until we have the one we want
+                lsr
+                bpl LR_DecodeLength
+LR_DecodeLengthDone:
+                and #$03
+LR_HasLength:   cmp #$03                        ;3 byte long instructions need relocation
+                bne LR_CodeRelocLoop
+                ldy #$02
+                lda (zpDestLo),y                ;Read absolute address highbyte
+                cmp #>(fileAreaStart+$100)      ;Is it a reference to self or to resident code/data?
+                bcc LR_NoRelocation             ;(filearea start may not be page-aligned, but the common sprites
+                cmp #>fileAreaEnd               ;will always be first)
+                bcs LR_NoRelocation
+                dey
+                jsr LR_RelocAddDelta
+LR_NoRelocation:lda #$03
+                bne LR_CodeRelocLoop
+
+LR_RelocAddDelta:
+                lda (zpDestLo),y
                 clc
                 adc zpBitsLo
                 sta (zpDestLo),y
@@ -116,67 +163,9 @@ LF_RelocateLoop:lda (zpDestLo),y                ;Relocate object pointers
                 lda (zpDestLo),y
                 adc zpBitsHi
                 sta (zpDestLo),y
-                iny
-                dex
-                bne LF_RelocateLoop
-LF_RelocDone:   ldy zpBitBuf
-                cpy #C_FIRSTSCRIPT
-                bcc LF_NoCodeReloc
-                ldy #$00
-                jsr LF_GetObjectAddress         ;Start relocation from the first entrypoint (must be first in file)
-                ;lda fileNumObjects,y           ;Assume that code starts immediately past the object pointers
-                ;asl
-                ;adc zpDestLo
-                ;sta zpSrcLo
-                ;lda zpDestHi
-                ;adc #$00
-                ;sta zpSrcHi
-LF_CodeRelocLoop:
-                ldy #$00
-                lda (zpSrcLo),y                 ;Read instruction
-                beq LF_CodeRelocDone            ;BRK - done
-                lsr
-                lsr
-                lsr
-                bcc LF_LookupLength
-                and #$01                        ;Instructions xc - xf are always 3 bytes
-                ora #$02                        ;Instructions x4 - x7 are always 2 bytes
-                bne LF_HasLength
-LF_LookupLength:tax
-                lda (zpSrcLo),y
-                and #$03
-                tay
-                lda instrLenTbl,x               ;4 lengths packed into one byte
-LF_DecodeLength:dey
-                bmi LF_DecodeLengthDone
-                lsr                             ;Shift until we have the one we want
-                lsr
-                bpl LF_DecodeLength
-LF_DecodeLengthDone:
-                and #$03
-LF_HasLength:   cmp #$03                        ;3 byte long instructions need relocation
-                bne LF_NotAbsolute
-                ldy #$02
-                lda (zpSrcLo),y                 ;Read absolute address highbyte
-                cmp #>(fileAreaStart+$100)      ;Is it a reference to self or to resident code/data?
-                bcc LF_NoRelocation             ;(filearea start may not be page-aligned, but the common sprites
-                cmp #>fileAreaEnd               ;will always be first)
-                bcs LF_NoRelocation
-                dey
-                lda (zpSrcLo),y                 ;Add relocation offset to the absolute address
-                adc zpBitsLo
-                sta (zpSrcLo),y
-                iny
-                lda (zpSrcLo),y
-                adc zpBitsHi
-                sta (zpSrcLo),y
-LF_NoRelocation:lda #$03
-LF_NotAbsolute: ldx #<zpSrcLo
-                jsr Add8
-                jmp LF_CodeRelocLoop
-LF_CodeRelocDone:
-PF_Done:
-LF_NoCodeReloc: rts
+LR_CodeRelocDone:
+LR_NoCodeReloc:
+PF_Done:        rts
 
         ; Remove a chunk-file from memory
         ;
@@ -264,7 +253,7 @@ PF_RelocLoop:   ldx zpLenLo
                 adc zpBitsHi
                 sta fileHi,y
                 sta zpDestHi
-                jsr LF_Relocate                 ;Relocate the object pointers
+                jsr LR_Relocate                 ;Relocate the object pointers
                 ldy zpBitBuf
 PF_RelocNext:   dey
                 bpl PF_RelocLoop
@@ -295,15 +284,13 @@ PurgeUntilFreeNoNew:
                 sta dataSizeLo
                 sta dataSizeHi
 PurgeUntilFree: lda freeMemLo
+                clc
+                adc dataSizeLo
                 sta zpBitsLo
+                tax
                 lda freeMemHi
-                sta zpBitsHi
-                ldx #<zpBitsLo
-                ldy #<dataSizeLo
-                jsr Add16
-                lda zpBitsLo
-                cmp zoneBufferLo
-                lda zpBitsHi
+                adc dataSizeHi
+                cpx zoneBufferLo
                 sbc zoneBufferHi
                 bcc PUF_HasFreeMemory
 PUF_Loop:       ldx #$01

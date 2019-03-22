@@ -43,43 +43,15 @@ MAX_SEQUENCE_LENGTH_256 = 1
 ; more suitable address.
 ; -------------------------------------------------------------------
 
-get_bits:
-        adc #$80                ; needs c=0, affects v
-        asl
-        bpl gb_skip
-gb_next:
-        asl zpBitBuf
-        bne gb_ok
-        pha
-        php
-        jsr GetByte
-        plp
-        rol
-        sta zpBitBuf
-        pla
-gb_ok:
-        rol
-        bmi gb_next
-gb_skip:
-        bvc gb_get_done
-        sta zpBitsHi
-        jsr GetByte
-        sec
-gb_get_done:
-DepackError:
-        rts
-
-        ; Load file packed with Exomizer 3 forward mode
+        ; Depack from file stream packed with Exomizer 3 forward mode
         ;
-        ; Parameters: A,X load address, fileNumber
-        ; Returns: C=0 if loaded OK, or C=1 and error code in A (see GetByte)
+        ; Parameters: A,X load address
+        ; Returns: -
         ; Modifies: A,X,Y
 
-LoadFile:       sta zpDestLo
+Depack:         sta zpDestLo
                 stx zpDestHi
-                jsr OpenFile
-Depack:
-
+DepackDestSet:
 ; -------------------------------------------------------------------
 ; jsr this label to decrunch, it will in turn init the tables and
 ; call the decruncher
@@ -88,13 +60,13 @@ Depack:
 ; init zeropage, x and y regs. (12 bytes)
 ;
         jsr GetByte
-        bcs DepackError
         sta zpBitBuf
         ldy #0
 ; -------------------------------------------------------------------
 ; calculate tables (62 bytes) + get_bits macro
 ; x and y must be #0 when entering
 ;
+        clc
 table_gen:
         tax
         tya
@@ -132,7 +104,7 @@ rolled:
         bmi no_fixup_lohi
         lda zpLenHi
         stx zpLenHi
-        dc.b $24
+        skip1
 no_fixup_lohi:
         txa
 ; -------------------------------------------------------------------
@@ -174,9 +146,7 @@ next_round:
 no_literal1:
         asl
         bne nofetch8
-        php
         jsr GetByte
-        plp
         rol
 nofetch8:
         inx
@@ -219,9 +189,7 @@ gbnc2_next:
         asl zpBitBuf
         bne gbnc2_ok
         tax
-        php
         jsr GetByte
-        plp
         rol
         sta zpBitBuf
         txa
@@ -325,8 +293,8 @@ get_literal_byte:
 ; -------------------------------------------------------------------
 ; exit or literal sequence handling (16(12) bytes)
 ;
-exit_or_lit_seq:
     if LITERAL_SEQUENCES_NOT_USED = 0
+exit_or_lit_seq:
         beq decr_exit
         jsr GetByte
     if MAX_SEQUENCE_LENGTH_256 = 0
@@ -335,6 +303,7 @@ exit_or_lit_seq:
         jsr GetByte
         tax
     if FORWARD_DECRUNCHING > 0
+        clc
         bcc copy_next
     else
         sec
@@ -342,7 +311,35 @@ exit_or_lit_seq:
     endif
 decr_exit:
     endif
-        clc
+        rts
+
+; -------------------------------------------------------------------
+; get bits from stream
+;
+get_bits:
+        adc #$80                ; needs c=0, affects v
+        asl
+        bpl gb_skip
+gb_next:
+        asl zpBitBuf
+        bne gb_ok
+        pha
+        jsr GetByte
+        rol
+        sta zpBitBuf
+        pla
+gb_ok:
+        rol
+        bmi gb_next
+gb_skip:
+        bvc gb_get_done
+        sta zpBitsHi
+        jsr GetByte
+        sec
+    if LITERAL_SEQUENCES_NOT_USED > 0
+exit_or_lit_seq:
+    endif
+gb_get_done:
         rts
 
 ; -------------------------------------------------------------------
