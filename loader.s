@@ -773,7 +773,7 @@ ilSlowLoadStart:
         ; Returns: byte in A, fileOpen set to 0 after EOF
         ; Modifies: A
 
-SlowGetByte:    lda #$00                        ;Check for first buffered byte
+SlowGetByte:    lda #$36                        ;Check for first buffered byte
                 bmi SGB_BufferedByte
                 sta $01
                 php
