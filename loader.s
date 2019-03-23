@@ -773,7 +773,7 @@ ilSlowLoadStart:
         ; Returns: byte in A, fileOpen set to 0 after EOF
         ; Modifies: A
 
-SlowGetByte:    lda loadBufferPos               ;Check for first buffered byte
+SlowGetByte:    lda #$00                        ;Check for first buffered byte
                 bmi SGB_BufferedByte
                 sta $01
                 php
@@ -785,7 +785,7 @@ KernalOff:      dec $01
                 rts
 SGB_BufferedByte:
                 php
-                asl loadBufferPos
+                asl SlowGetByte+1
                 lda loadTempReg
                 plp
                 rts
@@ -849,7 +849,7 @@ PrepareKernalIO:pha                             ;Convert filenumber to filename
                 endif
                 jsr StopIrq
                 lda #$36/2+$80
-                sta loadBufferPos               ;First buffered byte indicator + $01 value
+                sta SlowGetByte+1               ;First buffered byte indicator + shifted $01 value
                 asl
                 sta $01
 SetFileName:    lda #$05

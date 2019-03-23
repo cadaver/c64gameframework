@@ -302,10 +302,8 @@ GB_SectorLda:   lda $8000
                 inc GB_SectorLda+1
                 dec loadBufferPos
                 beq GB_FillBuffer
-Restore01:      pha
-                lda #$35
-                sta $01
-                pla
+Restore01:      dec $01
+                dec $01
                 rts
 
 OpenFileEF:     jsr FileOpenSub
