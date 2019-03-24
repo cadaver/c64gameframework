@@ -144,7 +144,7 @@ Drv1MHzCopy:    lda Drv1MHzSend,y
                 dey
                 bpl Drv1MHzCopy
                 bmi DrvPatchDone
-DrvNot1541:     
+DrvNot1541:
 DrvPatch1800Loop:
                 ldy drv1800Ofs                  ;Patch $1800 accesses
                 beq DrvPatch1800Done            ;Offset 0 = endmark
@@ -176,7 +176,7 @@ DrvBeginDelay:  inx                             ;Delay to make sure C64 catches 
         ; Drive main loop
 
 DrvMain:        jsr DrvGetByte                  ;Get filenumber
-                tay
+                sta DrvFileNumber+1
                 jsr DrvGetByte                  ;Get command
                 bpl DrvLoad
 
@@ -184,12 +184,12 @@ DrvSave:        jsr DrvGetByte                  ;Get amount of bytes to expect
                 sta DrvSaveCountLo+1
                 jsr DrvGetByte
                 sta DrvSaveCountHi+1
-                ldx drvFileTrk,y
+                jsr DrvFindFile
+                bne DrvSaveFound
                 beq DrvSaveFinish               ;If file not found, just receive the bytes
-DrvSaveFound:   lda drvFileSct,y
 DrvSaveSectorLoop:
                 jsr DrvReadSector               ;First read the sector for T/S chain
-                ldy #$02
+DrvSaveFound:   ldy #$02
 DrvSaveByteLoop:jsr DrvGetSaveByte              ;Then get bytes from C64 and write
                 bcs DrvSaveSector               ;If last byte, save the last sector
                 sta drvBuf,y
@@ -206,19 +206,13 @@ DrvFlush:       lda #$a2                        ;Flush buffers (1581 and CMD dri
 DrvFlushJsr:    jsr DrvDoJob
                 jmp DrvMain
 
-DrvLoad:        ldx drvFileTrk,y                ;Check if has entry for file
-                bne DrvHasEntry
-                stx DrvCacheDir+1               ;If not, reset caching
-DrvHasEntry:    jsr DrvCacheDir                 ;No-op if already cached and last file was found
-                lda drvFileSct,y                ;Now check if file was actually found
-                ldx drvFileTrk,y
-                bne DrvFound
+DrvLoad:        jsr DrvFindFile
+                bne DrvSendBlk
 DrvFileNotFound:
 DrvEndMark:     stx drvBuf
                 stx drvBuf+1
                 jmp DrvSendBlk
 
-DrvFound:
 DrvSectorLoop:  jsr DrvReadSector               ;Read the data sector
 DrvSendBlk:     ldx #$00
 Drv2MHzSend:    lda drvBuf
@@ -343,7 +337,7 @@ DrvCheckID:     lda id,x                        ;Check for disk ID change
                 beq DrvIDOK
                 sta iddrv0,x
                 lda #$00                        ;If changed, force recache of dir
-                sta DrvCacheDir+1
+                sta DrvCacheStatus+1
 DrvIDOK:        dex
                 bpl DrvCheckID
                 pla
@@ -351,16 +345,18 @@ DrvIDOK:        dex
 
 DrvFdExec:      jsr $ff54                       ;FD2000 fix By Ninja
                 lda $03
-                rts
+DrvFindNoFile:  rts
 
-DrvCacheDir:    lda #$00                        ;Skip if already cached
-                bne DrvDirCached
+DrvFindFile:    lda #$01                        ;Retry dir caching once
+                sta DrvFindFileLoop+1
+DrvFindFileLoop:ldx #$00
+                beq DrvFindNoFile
+DrvCacheStatus: lda #$00                        ;Skip if already cached
+                bne DrvFileNumber
                 tax
 DrvClearFiles:  sta drvFileTrk,x                ;Mark all files as nonexistent first
                 inx
                 bne DrvClearFiles
-                tya
-                pha
 DrvDirTrk:      ldx drv1541DirTrk
 DrvDirSct:      lda drv1541DirSct               ;Read disk directory
 DrvDirLoop:     jsr DrvReadSector               ;Read sector
@@ -395,10 +391,18 @@ DrvSkipFile:    tya
                 lda drvBuf+1                    ;Go to next directory block, until no
                 ldx drvBuf                      ;more directory blocks
                 bne DrvDirLoop
-                inc DrvCacheDir+1               ;Cached, do not cache again until diskside change or file not found
-                pla                             ;Restore filenumber to Y
-                tay
-DrvDirCached:   rts
+                inc DrvCacheStatus+1            ;Cached, do not cache again until diskside change or file not found
+                stx DrvFindFileLoop+1           ;Do not retry caching more than once in FindFile loop
+DrvFileNumber:  ldy #$00
+                lda drvFileSct,y
+                ldx drvFileTrk,y                ;Check if has entry for file
+                bne DrvFindHasEntry
+                sta DrvCacheStatus+1            ;If not, reset caching
+                beq DrvFindFileLoop
+DrvFindHasEntry:jsr DrvReadSector               ;Read file's initial sector
+                lda DrvCacheStatus+1
+                beq DrvFindFileLoop             ;If diskside was changed in the meanwhile, recache dir & retry
+                rts
 
 DrvDecodeLetter:sec
                 sbc #$30
