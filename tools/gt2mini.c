@@ -1,5 +1,5 @@
 // Converter tool from GoatTracker2 song format to minimal player
-// Cadaver (loorni@gmail.com) 2/2018
+// Cadaver (loorni@gmail.com) 4/2019
 
 #include <ctype.h>
 #include <stdio.h>
@@ -101,6 +101,7 @@ unsigned char slidemap[65536];
 unsigned char vibratomap[65536];
 
 int mpinssize = 0;
+int mplegatoinssize = 0;
 int mpwavesize = 0;
 int mppulsesize = 0;
 int mpfiltsize = 0;
@@ -562,6 +563,7 @@ void clearmpsong(void)
     memset(mpinspulsepos, 0, sizeof mpinspulsepos);
     memset(mpinsfiltpos, 0, sizeof mpinsfiltpos);
     mpinssize = 0;
+    mplegatoinssize = 0;
     mpwavesize = 0;
     mppulsesize = 0;
     mpfiltsize = 0;
@@ -921,6 +923,7 @@ void convertsong(void)
         instrmap[e] = mpinssize+1;
         mpinssize++;
     }
+    mplegatoinssize = mpinssize;
 
     for (e = 1; e <= highestusedinstr; e++)
     {
@@ -1441,14 +1444,9 @@ unsigned char getlegatoinstr(unsigned char instr)
         }
     }
 
-    mpinsad[mpinssize] = 0;
-    mpinssr[mpinssize] = 0;
-    mpinsfirstwave[mpinssize] = 0;
-    mpinswavepos[mpinssize] = legatostepmap[instrlastwavepos[instr]];
-    mpinspulsepos[mpinssize] = 0;
-    mpinsfiltpos[mpinssize] = 0;
-    legatoinstrmap[instr] = mpinssize+0x81;
-    ++mpinssize;
+    mpinswavepos[mplegatoinssize] = legatostepmap[instrlastwavepos[instr]];
+    legatoinstrmap[instr] = mplegatoinssize+0x81;
+    ++mplegatoinssize;
 
     return legatoinstrmap[instr];
 }
@@ -1690,7 +1688,8 @@ void savempsong(const char* songfilename)
         totalsize += 6;
     totalsize += (highestusedsong+1) * 5;
     totalsize += (highestusedpatt+1) * 2;
-    totalsize += mpinssize * 6;
+    totalsize += mpinssize * 5;
+    totalsize += mplegatoinssize;
     totalsize += mpwavesize * 3;
     totalsize += mppulsesize * 3;
     totalsize += mpfiltsize * 3;
@@ -1722,6 +1721,7 @@ void savempsong(const char* songfilename)
         fprintf(out, "  dc.b %d\n", (highestusedsong+1)*5);
         fprintf(out, "  dc.b %d\n", highestusedpatt+1);
         fprintf(out, "  dc.b %d\n", mpinssize);
+        fprintf(out, "  dc.b %d\n", mplegatoinssize);
         fprintf(out, "  dc.b %d\n", mpwavesize);
         fprintf(out, "  dc.b %d\n", mppulsesize);
         fprintf(out, "  dc.b %d\n", mpfiltsize);
@@ -1750,9 +1750,9 @@ void savempsong(const char* songfilename)
     writeblock(out, "insAD", mpinsad, mpinssize);
     writeblock(out, "insSR", mpinssr, mpinssize);
     writeblock(out, "insFirstWave", mpinsfirstwave, mpinssize);
-    writeblock(out, "insWavePos", mpinswavepos, mpinssize);
     writeblock(out, "insPulsePos", mpinspulsepos, mpinssize);
     writeblock(out, "insFiltPos", mpinsfiltpos, mpinssize);
+    writeblock(out, "insWavePos", mpinswavepos, mplegatoinssize);
     writeblock(out, "waveTbl", mpwavetbl, mpwavesize);
     writeblock(out, "noteTbl", mpnotetbl, mpwavesize);
     writeblock(out, "waveNextTbl", mpwavenexttbl, mpwavesize);

@@ -3,15 +3,16 @@ SUBTUNE_MASK        = $03
 
 MUSIC_SILENCE       = $00
 
-MUSICHEADERSIZE = 6
+MUSICHEADERSIZE = 7
 
 FIXUP_SONGSIZE  = 0
 FIXUP_PATTSIZE  = 4
 FIXUP_INSSIZE   = 8
-FIXUP_WAVESIZE  = 12
-FIXUP_PULSESIZE = 16
-FIXUP_FILTSIZE  = 20
-FIXUP_NOSIZE    = $80
+FIXUP_LEGATOINSSIZE = 12
+FIXUP_WAVESIZE  = 16
+FIXUP_PULSESIZE = 20
+FIXUP_FILTSIZE  = 24
+FIXUP_NOSIZE    = 28
 
 FIXUP_ZERO      = 0
 FIXUP_MINUS1    = 1
@@ -23,7 +24,6 @@ TRANS           = $80
 SONGJUMP        = 0
 
 ENDPATT         = 0
-INS             = -1
 DUR             = $101
 WAVEPTR         = $7c
 KEYOFF          = $7e
@@ -176,29 +176,34 @@ PrS_NoFadeWait: lda #$ff
                 ldx musicDataHi
                 jsr Depack                      ;Load the actual music data
 
-        ; Set music data address.
+        ; Set new music data
 
-SetMusicData:   clc
-                lda musicDataLo
-                adc #MUSICHEADERSIZE
+SetMusicData:   lda #MUSICHEADERSIZE
+                clc
+                adc musicDataLo
                 sta trackPtrLo
-                lda musicDataHi
-                adc #$00
+                lda #$00
+                tax
+                adc musicDataHi
                 sta trackPtrHi
-                ldx #NUMFIXUPS-1
 SetMusicData_FixupLoop:
                 lda fixupDestLoTbl,x
                 sta pattPtrLo
                 lda fixupDestHiTbl,x
-                sta pattPtrHi
-                lda fixupTypeTbl,x
                 pha
-                bmi SetMusicData_AddDone
+                and #$03
+                adc #>PlayRoutine
+                sta pattPtrHi
+                pla
                 lsr
                 lsr
+                pha
+                lsr
+                lsr
+                cmp #FIXUP_NOSIZE/4
+                bcs SetMusicData_AddDone
                 tay
                 lda (musicDataLo),y
-                clc
                 adc trackPtrLo
                 sta trackPtrLo
                 bcc SetMusicData_AddDone
@@ -216,8 +221,9 @@ SetMusicData_AddDone:
                 lda trackPtrHi
                 sbc #$00
                 sta (pattPtrLo),y
-                dex
-                bpl SetMusicData_FixupLoop
+                inx
+                cpx #NUMFIXUPS
+                bcc SetMusicData_FixupLoop
                 rts
 
         ; Silence SID by zeroing mastervolume
@@ -565,7 +571,6 @@ Play_InsSRM1Access:                             ;instrument. Strictly speaking t
 Play_InsFirstWaveM1Access:
                 lda insFirstWave-1,y
                 sta $d404,x
-Play_FinishLegatoInit:
 Play_InsPulsePosM1Access:
                 lda insPulsePos-1,y
                 beq Play_SkipPulseInit
@@ -576,6 +581,7 @@ Play_InsFiltPosM1Access:
                 beq Play_SkipFiltInit
                 sta Play_FiltPos+1
 Play_SkipFiltInit:
+Play_FinishLegatoInit:
 Play_InsWavePosM1Access:
                 lda insWavePos-1,y
 Play_SetWavePos:sta chnWavePos,x
