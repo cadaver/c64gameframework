@@ -421,7 +421,7 @@ drv1541DirSct  = drvSendTbl+7                   ;Byte $01
 drv1581DirSct  = drvSendTbl+5                   ;Byte $03
 
 drv1541DirTrk:  dc.b 18
-drvReceiveBuf:
+drvReceiveBuf:  dc.b 0
 
                 if drvReceiveBuf >= $0700
                     err
@@ -457,6 +457,7 @@ InitLoader:     lda $d011
                 stx fileOpen
                 stx loaderMode                  ;Assume Kernal (fallback) mode
                 stx ntscFlag
+                stx $d07a                       ;SCPU to slow mode
 IL_DetectNtsc1: lda $d012                       ;Detect PAL/NTSC/Drean
 IL_DetectNtsc2: cmp $d012
                 beq IL_DetectNtsc2
