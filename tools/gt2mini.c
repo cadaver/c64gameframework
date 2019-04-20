@@ -1685,7 +1685,7 @@ void savempsong(const char* songfilename)
     int totalsize = 0;
 
     if (!baremode)
-        totalsize += 6;
+        totalsize += 7;
     totalsize += (highestusedsong+1) * 5;
     totalsize += (highestusedpatt+1) * 2;
     totalsize += mpinssize * 5;
