@@ -397,7 +397,7 @@ DrvFileNumber:  ldy #$00
                 lda drvFileSct,y
                 ldx drvFileTrk,y                ;Check if has entry for file
                 bne DrvFindHasEntry
-                sta DrvCacheStatus+1            ;If not, reset caching
+                stx DrvCacheStatus+1            ;If not, reset caching
                 beq DrvFindFileLoop
 DrvFindHasEntry:jsr DrvReadSector               ;Read file's initial sector
                 lda DrvCacheStatus+1

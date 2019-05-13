@@ -53,13 +53,17 @@ ClearScreen:    sta $d800,x
                 sei
                 sty $dc0d                       ;Disable & acknowledge IRQ sources (Y=$7f)
                 lda $dc0d
+                lda #<NMI
+                sta $0318
+                lda #>NMI
+                sta $0319
                 lda #$81                        ;Run CIA2 Timer A once to disable NMI from Restore keypress
                 sta $dd0d                       ;Timer A interrupt source
                 lda #$01                        ;Timer A count ($0001)
                 sta $dd04
                 stx $dd05
                 lda #%00011001                  ;Run Timer A in one-shot mode
-                sta $dd0e                       ;The Kernal NMI will execute, but that does not cause issues
+                sta $dd0e
                 lda #$06
                 ldx #<loaderFileName
                 ldy #>loaderFileName
@@ -91,6 +95,7 @@ LoadExomizer:   jsr ChrIn                       ;Load Exomizer (unpacked)
                 lda #<ldepackCodeEnd
                 ldx #>ldepackCodeEnd
                 jmp Depack
+NMI:            rti
 
 message:        dc.b "HOLD SPACE/FIRE FOR SAFE MODE "
 loaderFileName: dc.b "LOADER"
