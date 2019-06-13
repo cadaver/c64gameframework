@@ -574,7 +574,7 @@ WSD_Loop:       jsr SaveBytePair
                 jmp eeprom_write_disable        ;Writing the dir is always the last thing to do, disable save now
 
 StoreNewSaveFile:
-                lda fileNumber
+                lda loadTempReg
                 sta saveDirectory+1,y
                 lda zpBitsLo
                 sta saveDirectory+2,y
