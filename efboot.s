@@ -6,7 +6,7 @@ EASYFLASH_16K   = $07
 EASYFLASH_KILL  = $04
 
 FIRSTSAVEFILE   = $f0
-MAXSAVEFILES    = 16
+MAXSAVEFILES    = 15
 MAXSAVEPAGES    = 8                             ;How much the savefiles can take RAM in total (during preserve & erase)
 
 CrtHelper       = $0200
@@ -121,6 +121,7 @@ SavePreservedFiles:
 SavePreservedFileSkip:
                 ldx loadTempReg
                 inx
+                cpx #FIRSTSAVEFILE+MAXSAVEFILES
                 bne SavePreservedFiles
                 rts
 
