@@ -95,6 +95,7 @@ SavePreserveFileEnd:
                 lda zpBitsHi
                 sta saveFileLenHi-FIRSTSAVEFILE,x
                 inx
+                cpx #FIRSTSAVEFILE+MAXSAVEFILES
                 bne SavePreserveFiles
                 lda firstSaveBank               ;Erase save sector now
                 jsr $df86
