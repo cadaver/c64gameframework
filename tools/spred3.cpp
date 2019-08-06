@@ -872,7 +872,7 @@ void savespr()
                         const BoundingBox& bbox = spr.bboxes[j];
                         fwrite8(c64handle, bbox.x+bbox.sx-spr.hotspotx+cx + BOUNDS_ADJUST);
                         fwrite8(c64handle, -bbox.sx);
-                        fwrite8(c64handle, (bbox.y+bbox.sy-spr.hotspoty+cx)/2 + BOUNDS_ADJUST);
+                        fwrite8(c64handle, (bbox.y+bbox.sy-spr.hotspoty+cy)/2 + BOUNDS_ADJUST);
                         fwrite8(c64handle, -bbox.sy/2);
                     }
 
