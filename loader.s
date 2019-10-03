@@ -345,30 +345,43 @@ DrvIDOK:        dex
 
 DrvFdExec:      jsr $ff54                       ;FD2000 fix By Ninja
                 lda $03
-DrvFindNoFile:  rts
+                rts
 
-DrvFindFile:    lda #$01                        ;Retry dir caching once
-                sta DrvFindFileLoop+1
-DrvFindFileLoop:ldx #$00
-                beq DrvFindNoFile
-DrvCacheStatus: lda #$00                        ;Skip if already cached
-                bne DrvFileNumber
+DrvFindFail:    lda #$00                        ;If ID changed or file not found, force recache of dir
+                sta DrvCacheStatus+1
+DrvFindSuccess: rts
+
+DrvFindHasEntry:jsr DrvReadSector               ;Read file's initial sector
+                lda DrvCacheStatus+1
+                bne DrvFindSuccess              ;If diskside was changed in the meanwhile, recache dir & retry
+DrvFindFile:
+DrvCacheStatus: lda #$00                        ;Reset cache if diskside changed / file not found
+                bne DrvDirTrk
                 tax
 DrvClearFiles:  sta drvFileTrk,x                ;Mark all files as nonexistent first
                 inx
                 bne DrvClearFiles
-DrvDirTrk:      ldx drv1541DirTrk
-DrvDirSct:      lda drv1541DirSct               ;Read disk directory
-DrvDirLoop:     jsr DrvReadSector               ;Read sector
+DrvDirTrk:      ldx drv1541DirTrk               ;Start over from first directory block
+DrvDirSct:      lda drv1541DirSct
+DrvDirLoop:     stx DrvNextDirTrk+1
+                sta DrvNextDirSct+1
+DrvFileNumber:  ldy #$00
+                lda drvFileSct,y
+                ldx drvFileTrk,y                ;Check if already has entry for file
+                bne DrvFindHasEntry
+DrvNextDirSct:  lda #$00
+DrvNextDirTrk:  ldx #$00                        ;If not, read next directory block, until no more
+                beq DrvFindFail
+                inc DrvCacheStatus+1            ;At least 1 dir block read, do not reset until failed
+                jsr DrvReadSector               ;Read sector
                 ldy #$02
-DrvNextFile:    lda drvBuf,y                    ;File type must be PRG
+DrvFileLoop:    lda drvBuf,y                    ;File type must be PRG
                 and #$83
                 cmp #$82
                 bne DrvSkipFile
-                lda drvBuf+5,y                  ;Must be two-letter filename
-                cmp #$a0
-                bne DrvSkipFile
-                lda drvBuf+3,y                  ;Convert filename (assumed to be hexadecimal)
+                lda drvBuf+3,y                  ;Convert filename
+                cmp #$47                        ;Skip if not hexadecimal
+                bcs DrvSkipFile
                 jsr DrvDecodeLetter             ;into an index for the cache
                 asl
                 asl
@@ -387,22 +400,10 @@ DrvSkipFile:    tya
                 clc
                 adc #$20
                 tay
-                bcc DrvNextFile
+                bcc DrvFileLoop
                 lda drvBuf+1                    ;Go to next directory block, until no
                 ldx drvBuf                      ;more directory blocks
-                bne DrvDirLoop
-                inc DrvCacheStatus+1            ;Cached, do not cache again until diskside change or file not found
-                stx DrvFindFileLoop+1           ;Do not retry caching more than once in FindFile loop
-DrvFileNumber:  ldy #$00
-                lda drvFileSct,y
-                ldx drvFileTrk,y                ;Check if has entry for file
-                bne DrvFindHasEntry
-                stx DrvCacheStatus+1            ;If not, reset caching
-                beq DrvFindFileLoop
-DrvFindHasEntry:jsr DrvReadSector               ;Read file's initial sector
-                lda DrvCacheStatus+1
-                beq DrvFindFileLoop             ;If diskside was changed in the meanwhile, recache dir & retry
-                rts
+                bcs DrvDirLoop
 
 DrvDecodeLetter:sec
                 sbc #$30
