@@ -156,7 +156,9 @@ int main(int argc, char **argv)
     savestartoffset = (maxsize + 0x1ffff) & 0xfffe0000;
     cart[0x03ff] = (savestartoffset >> 14); // Save start bank
     memset(cart+savestartoffset, 0xff, 0x20000);
-    memset(cart+savestartoffset, 0x00, 0x100); // Make a "full" save directory, so that we will erase it as the first thing
+    // Mark the last save block used the first time around, so that EasyProg will erase/write the save sector to a known state
+    // The game itself will not need to erase at first
+    cart[savestartoffset+0xff] = 0;
     maxsize += 0x20000;
 
     FILE* out = fopen(argv[3], "wb");
