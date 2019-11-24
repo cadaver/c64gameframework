@@ -41,6 +41,9 @@ void insertfile(unsigned char filenum, int startoffset, unsigned char* data, int
         cart[0x0100+filenum] = (startoffset >> 14); // Bank
         cart[0x0200+filenum] = filesize & 0xff;
         cart[0x0300+filenum] = filesize >> 8;
+        // If filesize lowbyte 0, must predecrement highbyte
+        if (!(filesize & 0xff))
+            --cart[0x300+filenum];
     }
     memcpy(&cart[startoffset], data, filesize);
     int sectors = (filesize+0xff) >> 8;
