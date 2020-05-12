@@ -1111,8 +1111,11 @@ EL_Delay27:     jsr EL_Delay18
 EL_CloseReadFile:   
                 lda #$e0
 EL_CloseFile:   jsr EL_ListenAndSecond
-                jsr EL_Unlisten
-                dec fileOpen
+                jsr EL_Unlisten                 ;Returns with A=0
+EL_CloseFileDelay:
+                adc #$01
+                bne EL_CloseFileDelay           ;Delay for load - save - load -sequence with NTSC machine, which could hang up without
+                sta fileOpen
                 rts
 
         ; Init the eload1 drivecode
