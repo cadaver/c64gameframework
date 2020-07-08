@@ -14,14 +14,6 @@ Irq1:           sta irqSaveA
                 stx irqSaveX
                 sty irqSaveY
                 inc $01
-Irq1_TimerCountLo:
-                lda #<((IRQ3_LINE-IRQ1_LINE)*63)
-                sta $dc04
-Irq1_TimerCountHi:
-                lda #>((IRQ3_LINE-IRQ1_LINE)*63)
-                sta $dc05
-                lda #%00011001
-                sta $dc0e                       ;Run CIA1 Timer A once to trigger Irq3
                 if SHOW_SKIPPED_FRAME > 0
                 lda newFrameFlag                ;If newframeflag was zero at this point, frame was skipped
                 bne Irq1_NoSkippedFrame
@@ -33,7 +25,15 @@ Irq1_NoSkippedFrame:
                 if USETURBOMODE > 0
                 sta $d07a                       ;SCPU back to slow mode
                 sta $d030                       ;C128 back to 1MHz
-                endif
+                endif                
+Irq1_TimerCountLo:
+                lda #<((IRQ3_LINE-IRQ1_LINE)*63)
+                sta $dc04
+Irq1_TimerCountHi:
+                lda #>((IRQ3_LINE-IRQ1_LINE)*63)
+                sta $dc05
+                lda #%00011001
+                sta $dc0e                       ;Run CIA1 Timer A once to trigger Irq3
 Irq1_ScrollX:   lda #$17
                 sta $d016
 Irq1_ScrollY:   lda #$57
