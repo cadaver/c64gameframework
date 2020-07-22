@@ -69,9 +69,9 @@ void insertfile(unsigned char filenum, int startoffset, unsigned char* data, int
 
 int main(int argc, char **argv)
 {
-    if (argc < 2)
+    if (argc < 4)
     {
-        printf("Usage: makegmod2 <bootcode> <seqfile> <output>\n"
+        printf("Usage: makegmod2 <bootcode> <seqfile> <output> <eeprom>\n"
             "Builds gmod2 bin cartridge from bootcode (8KB) and sequencefile.");
         return 1;
     }
@@ -158,6 +158,18 @@ int main(int argc, char **argv)
     }
     fwrite(cart, maxsize, 1, out);
     fclose(out);
+    
+    unsigned char eeprom[2048];
+    memset(eeprom, 0, sizeof eeprom);
+    out = fopen(argv[4], "wb");
+    if (!out)
+    {
+        printf("Could not open outfile\n");
+        return 1;
+    }
+    fwrite(eeprom, 2048, 1, out);
+    fclose(out);
+
     printf("Cart image written, %d bytes\n", maxsize);
     return 0;
 }

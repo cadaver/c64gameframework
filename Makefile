@@ -18,8 +18,8 @@ exampleef.crt: example.d64 example.seq main.pak loadsym.s mainsymcart.s efboot.s
 
 examplegmod2.crt: example.d64 example.seq main.pak loadsym.s mainsymcart.s gmod2boot.s
 	dasm gmod2boot.s -ogmod2boot.bin -f3
-	makegmod2 gmod2boot.bin example.seq examplegmod2.bin
-	cartconv -p -i examplegmod2.bin -o examplegmod2.crt -t gmod2
+	makegmod2 gmod2boot.bin example.seq examplegmod2-flash.bin examplegmod2-eeprom.bin
+	cartconv -p -i examplegmod2-flash.bin -o examplegmod2.crt -t gmod2
 
 loader.prg: exomizer.s loader.s kernal.s memory.s
 	dasm ldepack.s -oloader.prg -f3 -sldepack.tbl
