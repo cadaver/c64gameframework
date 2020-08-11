@@ -1,6 +1,6 @@
 # C64gameframework
 
-Framework for multidirectionally scrolling games on the Commodore 64. Used in the upcoming MW ULTRA game.
+Framework for multidirectionally scrolling games on the Commodore 64. A modified version (practically this means optimized to be unusable except for the project in question) is used in the MW ULTRA game.
 
 Features:
 
@@ -232,7 +232,7 @@ See also [CovertBitops homepage](http://cadaver.github.io).
 
 ## License
 
-Copyright (c) 2018-2019 Lasse Öörni
+Copyright (c) 2018-2020 Lasse Öörni
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
