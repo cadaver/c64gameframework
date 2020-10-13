@@ -10,6 +10,7 @@ unsigned char* usedsectors = new unsigned char[0x1000];
 int bootcodesize = 8192-MAXFILES*4;
 int maxsize = 0;
 int savestartoffset = 0;
+int savefiles = 4;
 
 int getfreeoffset(int filesize)
 {
@@ -35,16 +36,14 @@ int getfreeoffset(int filesize)
 
 void insertfile(unsigned char filenum, int startoffset, unsigned char* data, int filesize, bool leaveholes = false)
 {
-    if (filenum < FIRSTSAVEFILE)
-    {
-        cart[0x0000+filenum] = ((startoffset >> 8) & 0x3f) + 0x80; // Startoffset within bank
-        cart[0x0100+filenum] = (startoffset >> 14); // Bank
-        cart[0x0200+filenum] = filesize & 0xff;
-        cart[0x0300+filenum] = filesize >> 8;
-        // If filesize lowbyte 0, must predecrement highbyte
-        if (!(filesize & 0xff))
-            --cart[0x300+filenum];
-    }
+    cart[0x0000+filenum] = ((startoffset >> 8) & 0x3f) + 0x80; // Startoffset within bank
+    cart[0x0100+filenum] = (startoffset >> 14); // Bank
+    cart[0x0200+filenum] = filesize & 0xff;
+    cart[0x0300+filenum] = filesize >> 8;
+    // If filesize lowbyte 0, must predecrement high size
+    if (!(filesize & 0xff))
+        --cart[0x300+filenum];
+
     memcpy(&cart[startoffset], data, filesize);
     int sectors = (filesize+0xff) >> 8;
     int startsec = startoffset >> 8;
@@ -77,9 +76,16 @@ int main(int argc, char **argv)
 {
     if (argc < 2)
     {
-        printf("Usage: makeef <bootcode> <seqfile> <output>\n"
-            "Builds easyflash bin cartridge from bootcode (16KB) and sequencefile.");
+        printf("Usage: makeef <bootcode> <seqfile> <output> [numsavefiles]\n"
+            "Builds easyflash bin cartridge from bootcode (16KB) and sequencefile.\nEach savefile allocates 64KB from the cart, by default there's room for 4.");
         return 1;
+    }
+    
+    if (argc > 4)
+    {
+        sscanf(argv[4], "%d", &savefiles);
+        ++savefiles;
+        savefiles &= 0xfe;
     }
 
     memset(cart, 0xff, 0x100000);
@@ -158,11 +164,20 @@ int main(int argc, char **argv)
 
     savestartoffset = (maxsize + 0x1ffff) & 0xfffe0000;
     cart[0x03ff] = (savestartoffset >> 14); // Save start bank
-    memset(cart+savestartoffset, 0xff, 0x20000);
-    // Mark the last save block used the first time around, so that EasyProg will erase/write the save sector to a known state
-    // The game itself will not need to erase at first
-    cart[savestartoffset+0xff] = 0;
-    maxsize += 0x20000;
+    for (int i = 0; i < savefiles/2; ++i)
+    {
+        cart[savestartoffset + i * 0x20000 + 0] = 0; // Mark save directory itself invalid in directory to invalid to force EasyProg to erase the save bank on writing
+        cart[savestartoffset + i * 0x20000 + 1] = 0; // Even files in low bank
+        cart[savestartoffset + i * 0x20000 + 0x2000] = 0;
+        cart[savestartoffset + i * 0x20000 + 0x2001] = 0; // Odd files in high bank
+    }
+
+    maxsize += savefiles * 0x10000;
+    if (maxsize > 0x100000)
+    {
+        printf("Cart too large\n");
+        return 1;
+    }
 
     FILE* out = fopen(argv[3], "wb");
     if (!out)
