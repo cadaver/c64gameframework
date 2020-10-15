@@ -83,44 +83,45 @@ EEPROM_CLOCK    = $20
 EEPROM_DATAIN   = $10
 
 ; copy of the value stored into the cartridge register
-GMOD2REG_SHADOW         = zpLenLo              ;This and rest of the ZP loader vars are not to be modified during savefile access
-eeprom_data_temp        = loadBufferPos
+gmod2ShadowReg  = zpLenLo              ;This and rest of the ZP loader vars are not to be modified during savefile access
+eepromDataTemp  = loadBufferPos
 
 ;------------------------------------------------------------
 eeprom_reset:
                 lda #$00
-eeprom_set_reg_and_shadow:
-                sta GMOD2REG_SHADOW
-                sta GMOD2REG
-                rts
+                beq eeprom_set_reg_and_shadow
 
 ;------------------------------------------------------------
 ; set chip select = low
 eeprom_write_end:
                 jsr eeprom_wait_ready
 eeprom_cs_lo:
-                lda GMOD2REG_SHADOW
+                lda gmod2ShadowReg
                 and #255-(EEPROM_SELECT)
-                jmp eeprom_set_reg_and_shadow
+eeprom_set_reg_and_shadow:
+                sta gmod2ShadowReg
+                sta GMOD2REG
+                rts
 
 ;------------------------------------------------------------
 ; set chip select = high
 eeprom_cs_high:
-                lda GMOD2REG_SHADOW
+                lda gmod2ShadowReg
                 ora #(EEPROM_SELECT)
                 bne eeprom_set_reg_and_shadow
 
 ;------------------------------------------------------------
-; set clock = low
-eeprom_clk_lo:
-                lda GMOD2REG_SHADOW
+; set clock = low and decrement X. X must not become negative
+eeprom_clk_lo_decx:
+                lda gmod2ShadowReg
                 and #255-(EEPROM_CLOCK)
-                jmp eeprom_set_reg_and_shadow
+                dex
+                bpl eeprom_set_reg_and_shadow
 
 ;------------------------------------------------------------
 ; set clock = high
 eeprom_clk_high:
-                lda GMOD2REG_SHADOW
+                lda gmod2ShadowReg
                 ora #(EEPROM_CLOCK)
                 bne eeprom_set_reg_and_shadow
 
@@ -175,21 +176,22 @@ eeprom_write_byte:
 eeprom_send_byte:
                 ldx #$08
 eeprom_send_bits:
-                sta eeprom_data_temp
+                sta eepromDataTemp
 eeprom_send_bits_loop:
-                asl eeprom_data_temp
-                lda GMOD2REG_SHADOW
+                asl eepromDataTemp
+                lda gmod2ShadowReg
                 and #255-(EEPROM_DATAIN)
                 bcc eeprom_send_bits_low
                 ora #(EEPROM_DATAIN)
 eeprom_send_bits_low:
-                sta GMOD2REG_SHADOW
+                sta gmod2ShadowReg
                 sta GMOD2REG
+                bit $00                         ;Hole in memory for Kernal
                 jsr eeprom_clk_high
-                jsr eeprom_clk_lo
-                dex
+                jsr eeprom_clk_lo_decx
                 bne eeprom_send_bits_loop
                 rts
+                dc.b $00                        ;Hole in memory for Kernal
 
 ;------------------------------------------------------------
 ; returns: A: the byte the was read
@@ -197,13 +199,14 @@ eeprom_receive_byte:
                 ldx #$08
 eeprom_receive_byte_loop:
                 jsr eeprom_clk_high
-                jsr eeprom_clk_lo
+                jsr eeprom_clk_lo_decx
+                bit $00                         ;Hole in memory for Kernal
                 lda GMOD2REG
                 asl
-                rol eeprom_data_temp
-                dex
+                rol eepromDataTemp
+                txa
                 bne eeprom_receive_byte_loop
-                lda eeprom_data_temp
+                lda eepromDataTemp
                 rts
 
 ;------------------------------------------------------------
@@ -244,8 +247,9 @@ eeprom_reset_and_read_begin:
                 tya
                 pha
                 txa
-                and #$03
                 asl
+                bit $00                 ; Hole in the memory for Kernal
+                and #$06
                 asl
                 asl
                 ora #%11000000          ; 110xx = startbit, read, 2 bits addr

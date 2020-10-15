@@ -177,6 +177,18 @@ crtHelperCodeStart:
 
                 rorg CrtHelper
 
+FileOpenSub:    ldx $d011                       ;Wait until bottom so that panelsplit IRQ will know to take advance
+                bpl FileOpenSub
+                inc fileOpen
+                ldx #$37
+                stx $01                         ;Cart ROM accessible
+                ldx #$00
+                stx $d07a                       ;SCPU to slow mode
+                stx $d030                       ;C128 back to 1MHz mode
+                stx $de00                       ;Directory bank
+                rts
+NMI:            rti
+
 GetSaveFileBank:ldx #$80
                 ldy #$a0
                 lsr
@@ -193,27 +205,13 @@ GSFB_Low:       stx saveDirHi
                 sta saveFileBank
                 rts
 
-SaveFileEF:     sta saveFileNumber
-                lda zpSrcLo                     ;Purge overwrites these, so copy elsewhere
-                sta saveSrcLo
-                lda zpSrcHi
-                sta saveSrcHi
-                lda zpBitsLo
-                sta saveSizeLo
-                lda zpBitsHi
-                sta saveSizeHi
-                lda #<EasyAPI
-                sta zoneBufferLo
-                lda #>EasyAPI
-                sta zoneBufferHi
-                jsr PurgeUntilFreeNoNew         ;Make room for all save files in case we need to preserve+erase
-CopySaveCode:   lda saveCode-$4000,x
+SaveFileEF:     sta loadTempReg
+                jsr FileOpenSub                 ;ROM on, turbo mode off
+                ldx #$00
+CopySaveCode:   lda saveCode-$4000,x            ;Copy the main save code to RAM & finish
                 sta SaveEraseFinish,x
                 inx
                 bne CopySaveCode
-                lda saveFileNumber
-                sta loadTempReg
-                jsr FileOpenSub                 ;ROM on, turbo mode off
                 jmp SaveEraseFinish
 
 OF_SaveFile:    sta loadTempReg
@@ -221,7 +219,10 @@ OF_SaveFile:    sta loadTempReg
                 sta $de00
                 stx GB_BankReload+1
                 sty GB_BankEndCmp+1
-                stx OF_SaveLoop+2
+                jmp OF_SaveFinish
+                ds.b 32,0                       ;Hole for Kernal
+
+OF_SaveFinish:  stx OF_SaveLoop+2
                 stx OF_SaveLengthLoop+2
                 inx
                 stx OF_SaveEndFound+2
@@ -238,10 +239,13 @@ OF_SaveFound:   txa
                 ora saveDirHi
                 sta GB_SectorLda+2              ;Savefile sector within bank
                 txa
-                ldy #$05
-OF_SaveBankLoop:lsr
-                dey
-                bne OF_SaveBankLoop
+                lsr
+                lsr
+                lsr
+                lsr
+                bit $00                         ;Hole for Kernal
+                lsr
+                ldy #$00
                 ora saveFileBank                ;Savefile start bank
                 sta GB_BankNum+1
 OF_SaveLengthLoop:
@@ -256,18 +260,6 @@ OF_SaveEndFound:lda $8100,x                     ;Length of last sector was store
                 iny
 OF_NoLastFullSector:
                 jmp OF_StoreSectorCount
-
-FileOpenSub:    ldx $d011                       ;Wait until bottom so that panelsplit IRQ will know to take advance
-                bpl FileOpenSub
-                inc fileOpen
-                ldx #$37
-                stx $01                         ;Cart ROM accessible
-                ldx #$00
-                stx $d07a                       ;SCPU to slow mode
-                stx $d030                       ;C128 back to 1MHz mode
-                stx $de00                       ;Directory bank
-                rts
-NMI:            rti
 
 firstSaveBank:  dc.b 0
 saveFileBank:   dc.b 0
