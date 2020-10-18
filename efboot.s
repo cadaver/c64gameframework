@@ -45,7 +45,7 @@ WaitRAM:        sta $0100,x                     ;Write to RAM to make sure it st
 saveCode:
 
                 rorg SaveEraseFinish
-            
+
 CopyEasyAPI:    lda $b800,x                     ;Copy EasyAPI to RAM
                 sta EasyAPI,x
                 lda $b900,x
@@ -58,7 +58,7 @@ CopyEasyAPI:    lda $b800,x                     ;Copy EasyAPI to RAM
                 jsr SilenceSID
                 sta $d01a                       ;Raster IRQs off
                 sta $d011                       ;Blank screen completely
-                sta fileOpen                    ;Preserve/erase needs to open further files, so clear fileopen flag (IRQs disabled, no risk of reentering turbo mode)
+                sta fileOpen                    ;Clear fileopen flag (IRQs disabled, no risk of reentering turbo mode)
                 jsr EasyAPIInit                 ;Init EasyAPI
                 bcc SaveInitOK
                 lda #$02
