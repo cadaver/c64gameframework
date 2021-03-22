@@ -27,7 +27,7 @@ saveSizeLo      = actLo
 saveSizeHi      = actHi
 
                 processor 6502
-                org $e400                       ;First KB of first bank is the non-writable file directory
+                org $e000                       
 
 ColdStart:      sei
                 ldx #$ff

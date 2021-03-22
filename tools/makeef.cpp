@@ -7,7 +7,7 @@
 
 unsigned char* cart = new unsigned char[0x100000];
 unsigned char* usedsectors = new unsigned char[0x1000];
-int bootcodesize = 8192-MAXFILES*4;
+int bootcodesize = 8192;
 int maxsize = 0;
 int savestartoffset = 0;
 int savefiles = 4;
