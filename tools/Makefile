@@ -17,11 +17,11 @@ editdata.c: dat2inc.exe editor.dat
 	dat2inc editor.dat editdata.c
 
 worlded3.exe: worlded3.cpp editdata.c stb_image_write.c
-	g++ worlded3.cpp editdata.c stb_image_write.c libbme.a -oworlded3.exe -w -march=i386 -static-libstdc++ -static-libgcc -lmingw32 -lSDLmain -lSDL -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic
+	g++ worlded3.cpp editdata.c stb_image_write.c bme.c bme_gfx.c bme_io.c bme_win.c bme_kbd.c bme_mou.c -oworlded3.exe -fpermissive -w -march=i386 -static-libstdc++ -static-libgcc -lmingw32 -lSDLmain -lSDL -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic
 	strip worlded3.exe
 
 spred3.exe: spred3.cpp fileio.c editdata.c
-	g++ spred3.cpp fileio.c editdata.c libbme.a -ospred3.exe -w -march=i386 -static-libstdc++ -static-libgcc -lmingw32 -lSDLmain -lSDL -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic
+	g++ spred3.cpp fileio.c editdata.c bme.c bme_gfx.c bme_io.c bme_win.c bme_kbd.c bme_mou.c  -ospred3.exe -fpermissive -w -march=i386 -static-libstdc++ -static-libgcc -lmingw32 -lSDLmain -lSDL -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic
 	strip spred3.exe
 
 gt2mini.exe: gt2mini.c fileio.c

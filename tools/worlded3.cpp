@@ -11,13 +11,9 @@
 #include <map>
 #include <algorithm>
 
-extern "C" {
-
 #include "bme.h"
 #include "editio.h"
 #include "stb_image_write.h"
-
-}
 
 #define MAXPATH 4096
 

@@ -11,9 +11,7 @@
 
 #include "fileio.h"
 
-extern "C" {
-    #include "bme.h"
-}
+#include "bme.h"
 
 #define LEFT_BUTTON 1
 #define RIGHT_BUTTON 2

@@ -21,8 +21,8 @@ void gfx_drawsprite(int x, int y, unsigned num);
 void gfx_drawspritec(int x, int y, unsigned num, int color);
 void gfx_drawspritex(int x, int y, unsigned num, Uint8 *xlattable);
 void gfx_getspriteinfo(unsigned num);
-void gfx_fillscreen(char color);
-void gfx_plot(int x, int y, char color);
+void gfx_fillscreen(int color);
+void gfx_plot(int x, int y, int color);
 void gfx_line(int x1, int y1, int x2, int y2, int color);
 
 extern int gfx_initted;
