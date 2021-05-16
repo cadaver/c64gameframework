@@ -56,7 +56,7 @@ void insertfile(unsigned char filenum, int startoffset, unsigned char* data, int
             // For the bootcode, we can leave holes in the allocation to fill it with data files later
             for (int j = 0; j < 256; ++j)
             {
-                if (cart[startsec*256+j] != 0xff)
+                if (cart[i*256+j] != 0xff)
                 {
                     usedsectors[i] = 1;
                     break;
