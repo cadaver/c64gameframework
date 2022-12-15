@@ -144,8 +144,8 @@ complexSprCount = xHi                           ;Reused during actor render
 complexSprTemp  = yHi
 oldSprLo        = wpnLo
 oldSprHi        = wpnHi
-oldSprHeaderLo  = loadTempReg
-oldSprHeaderHi  = loadBufferPos
+oldSprHeaderLo  = loadBufferPos
+oldSprHeaderHi  = loadTempReg
 cacheAdr        = wpnLo
 sliceMask       = wpnHi
 
