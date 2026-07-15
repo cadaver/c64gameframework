@@ -27,7 +27,7 @@ saveSizeLo      = actLo
 saveSizeHi      = actHi
 
                 processor 6502
-                org $e000                       
+                org $e000
 
 ColdStart:      sei
                 ldx #$ff
@@ -75,7 +75,7 @@ SaveExecute:    lda loadTempReg
                 jsr GetSaveFileBank
                 stx SaveSeekEmpty+2
                 stx SaveCmpOld+2
-                lda saveSizeLo                    ;Filesize-1 to know how many sectors to fill
+                lda saveSizeLo                  ;Filesize-1 to know how many sectors to fill
                 sec
                 sbc #$01
                 lda saveSizeHi
@@ -256,9 +256,6 @@ OF_SaveLengthLoop:
                 iny
                 bne OF_SaveLengthLoop
 OF_SaveEndFound:lda $8100,x                     ;Length of last sector was stored when saving
-                bne OF_NoLastFullSector         ;If it's full, increment number of sectors
-                iny
-OF_NoLastFullSector:
                 jmp OF_StoreSectorCount
 
 firstSaveBank:  dc.b 0
